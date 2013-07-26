@@ -141,7 +141,7 @@ add_pool_latin1(_) ->
 
 add_pool_latin1_compatible(_) ->
     emysql:add_pool(?POOL, 10, emysql_util:test_u(), emysql_util:test_p(),
-        "localhost", 3306, undefined, latin1),
+        "localhost", 3306, undefined, undefined),
     #result_packet{rows=[[<<"latin1">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 

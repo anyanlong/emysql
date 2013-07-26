@@ -42,6 +42,8 @@ set_database(Connection, Database) ->
     Packet = <<?COM_QUERY, "use `", (iolist_to_binary(Database))/binary, "`">>,  % todo: utf8?
     emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
 
+set_encoding(_, undefined) ->
+    ok;
 set_encoding(Connection, Encoding) ->
     Packet = <<?COM_QUERY, "set names '", (erlang:atom_to_binary(Encoding, utf8))/binary, "'">>,
     emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
@@ -231,6 +233,7 @@ run_startcmds_or_die(#emysql_connection{socket=Socket}, StartCmds) ->
  
 set_encoding_or_die(#emysql_connection { socket = Socket } = Connection, Encoding) ->
     case set_encoding(Connection, Encoding) of
+        ok -> ok;
         OK2 when is_record(OK2, ok_packet) -> ok;
         Err2 when is_record(Err2, error_packet) ->
             gen_tcp:close(Socket),

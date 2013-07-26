@@ -231,9 +231,11 @@ The Emysql driver is an Erlang gen-server, and, application.
 	% Host = string()  
 	% Port = integer()  
 	% Database = string()  
-	% Encoding = atom()  
+	% Encoding = undefined | atom()
 	
 	emysql:add_pool(mypoolname, 1, "username", "mypassword", "localhost", 3306, "mydatabase", utf8).
+
+  If ``Encoding`` is ``undefined``, then no encoding is set.
 
 #### More Record Types
 
