@@ -160,7 +160,7 @@ add_pool_wrong_db(_) ->
         end
     ),
     receive
-        {'DOWN', Mref, process, Pid, {failed_to_set_database, _}} ->
+        {'DOWN', Mref, process, Pid, {{nocatch, {failed_to_set_database, _}}, _}} ->
             ok
     after 100 ->
             exit(should_have_failed)
@@ -176,7 +176,7 @@ add_pool_wrong_cmd(_) ->
         end
     ),
     receive
-        {'DOWN', Mref, process, Pid, {failed_to_run_cmd, _}} ->
+        {'DOWN', Mref, process, Pid, {{nocatch, {failed_to_run_cmd, _}}, _}} ->
             ok
     after 100 ->
             exit(should_have_failed)

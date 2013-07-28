@@ -135,7 +135,15 @@ do_gen_call(Msg) ->
 %%--------------------------------------------------------------------
 init([]) ->
     Pools = initialize_pools(),
-    Pools1 = [emysql_conn:open_connections(Pool) || Pool <- Pools],
+    Pools1 = lists:map(
+        fun (Pool) ->
+                case emysql_conn:open_connections(Pool) of
+                    {ok, Pool} -> Pool;
+                    {error, Reason} -> throw(Reason)
+                end
+        end,
+        Pools
+    ),
     {ok, #state{pools=Pools1}}.
 
 %%--------------------------------------------------------------------
