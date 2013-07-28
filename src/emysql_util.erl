@@ -42,7 +42,9 @@
          null_terminated_string/2,
          quote/1,
          rnd/3,
-         to_binary/1
+         to_binary/1,
+         test_u/0,
+         test_p/0
         ]).
 
 -include("emysql.hrl").
@@ -354,3 +356,16 @@ quote_loop([C | Rest], Acc) ->
 
 to_binary(L) when is_binary(L) -> L;
 to_binary(L) when is_list(L)   -> list_to_binary(L).
+
+%% @doc Username for testing. "hello_username" by default, "travis" if in travis
+test_u() ->
+    case os:getenv("TRAVIS") of
+        "true" -> "travis";
+        false -> "hello_username"
+    end.
+
+test_p() ->
+    case os:getenv("TRAVIS") of
+        "true" -> "";
+        false -> "hello_password"
+    end.
