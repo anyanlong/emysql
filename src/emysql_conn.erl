@@ -110,22 +110,28 @@ unprepare(Connection, Name) ->
     emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
 
 open_n_connections(PoolId, N) ->
-     %-% io:format("open ~p connections for pool ~p~n", [N, PoolId]),
     case emysql_conn_mgr:find_pool(PoolId, emysql_conn_mgr:pools()) of
         {Pool, _} ->
-            lists:foldl(fun(_ ,Connections) ->
+            lists:foldl(fun(_, {Conns, Reasons}) ->
                 %% Catch {'EXIT',_} errors so newly opened connections are not orphaned.
+                %% We do not want to close all the connections here like in
+                %% open_connections/2. Struggle to keep working.
                 case catch open_connection(Pool) of
                     #emysql_connection{} = Connection ->
-                        [Connection | Connections];
-                    _ ->
-                        Connections
+                        {[Connection | Conns], Reasons};
+                    {'EXIT', Reason} ->
+                        {Conns, [Reason | Reasons]}
                 end
             end, [], lists:seq(1, N));
         _ ->
             exit(pool_not_found)
     end.
 
+%% @doc Opens connections for the necessary pool.
+%%
+%% If connection opening fails, removes all connections from the pool
+%% Does not remove pool from emysql_conn_mgr due to a possible deadlock.
+%% Caller must do it by itself.
 open_connections(Pool) ->
      %-% io:format("open connections loop: .. "),
     case (queue:len(Pool#pool.available) + gb_trees:size(Pool#pool.locked)) < Pool#pool.size of
@@ -133,12 +139,16 @@ open_connections(Pool) ->
             case catch open_connection(Pool) of
                 #emysql_connection{} = Conn ->
                     open_connections(Pool#pool{available = queue:in(Conn, Pool#pool.available)});
-				_ ->
-					Pool
+                {'EXIT', Reason} ->
+                    AllConns = lists:append(
+                        queue:to_list(Pool#pool.available),
+                        gb_trees:values(Pool#pool.locked)
+                    ),
+                    lists:foreach(fun emysql_conn:close_connection/1, AllConns),
+                    {error, Reason}
 			end;
         false ->
-            %-% io:format(" done~n"),
-            Pool
+            {ok, Pool}
     end.
 
 open_connection(#pool{pool_id=PoolId, host=Host, port=Port, user=User,

@@ -232,8 +232,11 @@ add_pool(PoolId, Size, User, Passwd, Host, Port, DB, Encoding, StartCmds)
         encoding = Encoding,
         start_cmds = StartCmds
     },
-    Pool1 = emysql_conn:open_connections(Pool),
-    emysql_conn_mgr:add_pool(Pool1).
+    Pool2 = case emysql_conn:open_connections(Pool) of
+        {ok, Pool1} -> Pool1;
+        {error, Reason} -> throw(Reason)
+    end,
+    emysql_conn_mgr:add_pool(Pool2).
 
 %% @spec remove_pool(PoolId) -> ok
 %%      PoolId = atom()
@@ -251,28 +254,15 @@ remove_pool(PoolId) ->
     [emysql_conn:close_connection(Conn) || Conn <- lists:append(queue:to_list(Pool#pool.available), gb_trees:values(Pool#pool.locked))],
     ok.
 
-%% @spec increment_pool_size(PoolId, By) -> Result
-%%      PoolId = atom()
-%%      By = integer()
-%%      Result = {reply, ok, State1} | {reply, {error, pool_not_found}, State}
-%%
-%% @doc Synchronous call to the connection manager to enlarge a pool.
-%%
-%% This opens n=By new connections and adds them to the pool of id PoolId.
-%%
-%% === Implementation ===
-%%
-%% Opens connections and then adds them to the pool by a call to
-%% emysql_conn_mgr:add_connections().
-%%
-%% That this function exposes the State and possibly pool_not_found
-%% seems to be inconsistent with decrement_pool_size(), which invariably
-%% returns 'ok'.
-%% @end doc: hd feb 11
-
+-spec increment_pool_size(atom(), non_neg_integer()) -> ok | {error, list()}.
 increment_pool_size(PoolId, Num) when is_integer(Num) ->
-    Conns = emysql_conn:open_n_connections(PoolId, Num),
-    emysql_conn_mgr:add_connections(PoolId, Conns).
+    {Conns, Reasons} = emysql_conn:open_n_connections(PoolId, Num),
+    emysql_conn_mgr:add_connections(PoolId, Conns),
+    case Reasons of
+        [] -> ok;
+        _ -> {error, Reasons}
+    end.
+
 
 %% @spec decrement_pool_size(PoolId, By) -> ok
 %%      PoolId = atom()

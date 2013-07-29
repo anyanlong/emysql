@@ -69,8 +69,8 @@ init_per_testcase(T, Config) when
         T == connecting_to_db_and_creating_a_pool_transition orelse
         T == insert_a_record orelse
         T == select_a_record ->
-    emysql:add_pool(?POOL, 10, "hello_username",
-        "hello_password", "localhost", 3306, "hello_database", utf8),
+    emysql:add_pool(?POOL, 10, emysql_util:test_u(),
+        emysql_util:test_p(), "localhost", 3306, "hello_database", utf8),
     Config;
 
 init_per_testcase(_, Config) ->
@@ -128,39 +128,40 @@ select_a_record(_) ->
     emysql:execute(?POOL, <<"select hello_text from hello_table">>).
 
 add_pool_utf8(_) ->
-    emysql:add_pool(?POOL, 10, "hello_username", "hello_password", "localhost",
-        3306, undefined, utf8),
+    emysql:add_pool(?POOL, 10, emysql_util:test_u(), emysql_util:test_p(),
+        "localhost", 3306, undefined, utf8),
     #result_packet{rows=[[<<"utf8">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 
 add_pool_latin1(_) ->
-    emysql:add_pool(?POOL, 10, "hello_username", "hello_password", "localhost",
-        3306, undefined, latin1),
+    emysql:add_pool(?POOL, 10, emysql_util:test_u(), emysql_util:test_p(),
+        "localhost", 3306, undefined, latin1),
     #result_packet{rows=[[<<"latin1">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 
 add_pool_latin1_compatible(_) ->
-    emysql:add_pool(?POOL, 10, "hello_username", "hello_password", "localhost",
-        3306, undefined, latin1),
+    emysql:add_pool(?POOL, 10, emysql_util:test_u(), emysql_util:test_p(),
+        "localhost", 3306, undefined, latin1),
     #result_packet{rows=[[<<"latin1">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 
 add_pool_time_zone(_) ->
-    emysql:add_pool(?POOL, 10, "hello_username", "hello_password", "localhost",
-        3306, undefined, utf8, [<<"SET time_zone='+00:00'">>]),
+    emysql:add_pool(?POOL, 10, emysql_util:test_u(), emysql_util:test_p(),
+        "localhost", 3306, undefined, utf8, [<<"SET time_zone='+00:00'">>]),
     #result_packet{rows=[[<<"+00:00">>]]} =
     emysql:execute(?POOL, <<"SELECT @@time_zone;">>).
 
 add_pool_wrong_db(_) ->
     {Pid, Mref} = spawn_monitor(fun() ->
-                emysql:add_pool(?POOL, 10, "hello_username",
-                    "hello_password", "localhost", 3306,
+                emysql:add_pool(?POOL, 10, emysql_util:test_u(),
+                    emysql_util:test_p(), "localhost", 3306,
                     "this-database-does-not-exist", utf8
                 )
         end
     ),
     receive
-        {'DOWN', Mref, process, Pid, {failed_to_set_database, _}} ->
+        {'DOWN', Mref, process, Pid,
+            {{nocatch, {failed_to_set_database, _}}, _}} ->
             ok
     after 100 ->
             exit(should_have_failed)
@@ -170,13 +171,13 @@ add_pool_wrong_db(_) ->
 
 add_pool_wrong_cmd(_) ->
     {Pid, Mref} = spawn_monitor(fun() ->
-                emysql:add_pool(?POOL, 10, "hello_username",
-                    "hello_password", "localhost", 3306, undefined, utf8,
+                emysql:add_pool(?POOL, 10, emysql_util:test_u(),
+                    emysql_util:test_p(), "localhost", 3306, undefined, utf8,
                     [<<"syntax error">>])
         end
     ),
     receive
-        {'DOWN', Mref, process, Pid, {failed_to_run_cmd, _}} ->
+        {'DOWN', Mref, process, Pid, {{nocatch, {failed_to_run_cmd, _}}, _}} ->
             ok
     after 100 ->
             exit(should_have_failed)
