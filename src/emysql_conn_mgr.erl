@@ -324,7 +324,8 @@ initialize_pools() ->
             host = proplists:get_value(host, Props),
             port = proplists:get_value(port, Props),
             database = proplists:get_value(database, Props),
-            encoding = proplists:get_value(encoding, Props)
+            encoding = proplists:get_value(encoding, Props),
+            start_cmds = proplists:get_value(start_cmds, Props)
         } || {PoolId, Props} <- emysql_app:pools()
     ].
 
