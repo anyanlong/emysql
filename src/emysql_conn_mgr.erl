@@ -40,7 +40,7 @@
 
 -include("emysql.hrl").
 
--record(state, {pools}).
+-record(state, {pools, lockers = dict:new()}).
 
 %%====================================================================
 %% API
@@ -68,7 +68,7 @@ remove_connections(PoolId, Num) when is_integer(Num) ->
     do_gen_call({remove_connections, PoolId, Num}).
 
 lock_connection(PoolId)->
-	do_gen_call({lock_connection, PoolId, false}).
+	do_gen_call({lock_connection, PoolId, false, self()}).
 
 wait_for_connection(PoolId)->
 	wait_for_connection(PoolId, lock_timeout()).
@@ -77,7 +77,7 @@ wait_for_connection(PoolId ,Timeout)->
     %% try to lock a connection. if no connections are available then
     %% wait to be notified of the next available connection
     %-% io:format("~p waits for connection to pool ~p~n", [self(), PoolId]),
-    case do_gen_call({lock_connection, PoolId, true}) of
+    case do_gen_call({lock_connection, PoolId, true, self()}) of
         unavailable ->
             %-% io:format("~p is queued~n", [self()]),
             receive
@@ -170,7 +170,12 @@ handle_call({add_connections, PoolId, Conns}, _From, State) ->
     case find_pool(PoolId, State#state.pools) of
         {Pool, OtherPools} ->
             Pool1 = Pool#pool{available = queue:join(queue:from_list(Conns), Pool#pool.available)},
-            State1 = State#state{pools = [serve_waiting_pids(Pool1)|OtherPools]},
+	    {NewPool, NewMonitorData} = serve_waiting_pids(Pool1),
+	    NewLockers = lists:foldl(fun({MonitorRef, ConnInfo}, Dict) ->
+						     dict:store(MonitorRef, ConnInfo, Dict)
+				     end, State#state.lockers, NewMonitorData),
+            State1 = State#state{pools = [NewPool|OtherPools],
+				 lockers = NewLockers},
             {reply, ok, State1};
         undefined ->
             {reply, {error, pool_not_found}, State}
@@ -192,12 +197,14 @@ handle_call({remove_connections, PoolId, Num}, _From, State) ->
             {reply, {error, pool_not_found}, State}
     end;
 
-handle_call({lock_connection, PoolId, Wait}, {From, _Mref}, State) ->
+handle_call({lock_connection, PoolId, Wait, Who}, {From, _Mref}, State) ->
     case find_pool(PoolId, State#state.pools) of
         {Pool, OtherPools} ->
-            case lock_next_connection(Pool) of
-                {ok, Connection, PoolNow} ->
-                    {reply, Connection, State#state{pools=[PoolNow|OtherPools]}};
+            case lock_next_connection(Pool, Who) of
+                {ok, Connection, PoolNow, {MonitorRef, Data}} ->
+		    Lockers = State#state.lockers,
+                    {reply, Connection, State#state{pools=[PoolNow|OtherPools],
+						    lockers = dict:store(MonitorRef, Data, Lockers)}};
                 unavailable when Wait =:= true ->
                     %% place the calling pid at the end of the waiting queue of its pool
                     PoolNow = Pool#pool{waiting = queue:in(From, Pool#pool.waiting)},
@@ -241,27 +248,44 @@ handle_call({{replace_connection, Kind}, OldConn, NewConn}, _From, State) ->
     %% passed in to serve as the replacement for the old one.
     %% But i.e. if the sql server is down, it can be fed a dead
     %% old connection as new connection, to preserve the pool size.
-    {Result, NewState} =
-      with_pool(OldConn#emysql_connection.pool_id,
-                fun(#pool { available = Available, locked = Locked } = Pool) ->
+
+    case find_pool(OldConn#emysql_connection.pool_id, State#state.pools) of
+	    {#pool{available = Available, locked = Locked} = Pool, Pools} ->
+		    OldRef = OldConn#emysql_connection.monitor_ref,
                     Stripped = gb_trees:delete_any(OldConn#emysql_connection.id, Locked),
-                    case Kind of
-                       available ->
-                         ServedPool =
-                           serve_waiting_pids(
-                             Pool#pool { locked = Stripped,
-                                         available = queue:in(
-                                            NewConn#emysql_connection { locked_at = undefined },
-                                            Available) }),
-                         {ok, ServedPool};
-                       locked ->
-                         {ok, Pool#pool { locked = gb_trees:enter(NewConn#emysql_connection.id,
-                                                                  NewConn,
-                                                                  Stripped) }}
-                    end
-                end,
-                State),
-    {reply, Result, NewState};
+		    {NewPool, NewMonitors} =
+			    case Kind of
+				    available ->
+					    serve_waiting_pids(
+					      Pool#pool { locked = Stripped,
+							  available = queue:in(
+									NewConn#emysql_connection { locked_at = undefined,
+												    monitor_ref = undefined},
+									Available) });
+				    locked ->
+					    {Pool#pool { locked = gb_trees:enter(NewConn#emysql_connection.id,
+										 NewConn#emysql_connection{monitor_ref = OldRef},
+										 Stripped) },
+					     []} % There are no new monitors set up
+			    end,
+		    Lockers = State#state.lockers,
+		    NewLockers = case Kind of
+					 available ->
+						 %% Remove the current monitor as the connection has been freed
+						 %% Add the monitors for pids that has been take from the waiting queue
+						 erlang:demonitor(OldRef, [flush]),
+						 lists:foldl(fun({MonitorRef, ConnInfo}, Dict) ->
+									     dict:store(MonitorRef, ConnInfo, Dict)
+							     end, dict:erase(OldRef, Lockers), NewMonitors);
+					 locked ->
+						 %% We need to keep the monitor here
+						 dict:store(OldRef, {NewConn#emysql_connection.pool_id, NewConn#emysql_connection.id}, Lockers)
+				 end,
+		    {reply, ok, State#state{pools = [NewPool|Pools],
+					    lockers = NewLockers}};
+	   undefined ->
+		    {reply, {error, pool_not_found}, State}
+    end;
 
 handle_call(_, _From, State) -> {reply, {error, invalid_call}, State}.
 
@@ -280,9 +304,32 @@ handle_cast(_Msg, State) ->
 %%                                       {stop, Reason, State}
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
+handle_info({'DOWN', MonitorRef, _, _, _}, State) ->
+	case dict:find(MonitorRef, State#state.lockers) of
+		{ok, {PoolId, ConnId}} ->
+			case find_pool(PoolId, State#state.pools) of
+				{Pool, _} ->
+					case gb_trees:lookup(ConnId, Pool#pool.locked) of
+						{value, Conn} -> async_reset_conn(State#state.pools, Conn);
+						_             -> ok
+					end;
+				_ ->
+					ok
+			end;
+		_ ->
+			ok
+	end,
+    {noreply, State};
+
 handle_info(_Info, State) ->
     {noreply, State}.
 
+async_reset_conn(Pools, Conn) ->
+	spawn(fun() ->
+			      %% This interacts with the conn mgr so needs to be spawned
+			      %% TODO: refactor
+			      emysql_conn:reset_connection(Pools, Conn, pass)
+	      end).
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()
 %% Description: This function is called by a gen_server when it is about to
@@ -331,56 +378,50 @@ find_pool(PoolId, [#pool{pool_id = PoolId} = Pool|Tail], OtherPools) ->
 find_pool(PoolId, [Pool|Tail], OtherPools) ->
     find_pool(PoolId, Tail, [Pool|OtherPools]).
 
-lock_next_connection(Pool) ->
-	case lock_next_connection(Pool#pool.available, Pool#pool.locked) of
-		{ok, Connection, OtherAvailable, NewLocked} ->
-			{ok ,Connection ,Pool#pool{available=OtherAvailable, locked=NewLocked}};
+lock_next_connection(Pool, Who) ->
+	case lock_next_connection(Pool#pool.available, Pool#pool.locked, Who) of
+		{ok, Connection, OtherAvailable, NewLocked, MonitorTuple} ->
+			{ok ,Connection ,Pool#pool{available=OtherAvailable, locked=NewLocked}, MonitorTuple};
 		unavailable ->
 			unavailable
 	end.
 
-lock_next_connection(Available ,Locked) ->
+lock_next_connection(Available ,Locked, Who) ->
 	case queue:out(Available) of
 		{{value, Conn}, OtherAvailable} ->
-            NewConn = connection_locked_at(Conn),
+			MonitorRef = erlang:monitor(process, Who),
+            NewConn = connection_locked_at(Conn, MonitorRef),
+			MonitorTuple = {MonitorRef,
+					{NewConn#emysql_connection.pool_id, NewConn#emysql_connection.id}},
 			NewLocked = gb_trees:enter(NewConn#emysql_connection.id, NewConn, Locked),
-			{ok, NewConn, OtherAvailable, NewLocked};
+			{ok, NewConn, OtherAvailable, NewLocked, MonitorTuple};
         {empty, _} ->
             unavailable
     end.
 
-connection_locked_at(Conn) ->
-    Conn#emysql_connection{locked_at=lists:nth(2, tuple_to_list(now()))}.
+connection_locked_at(Conn, MonitorRef) ->
+	Conn#emysql_connection{locked_at=lists:nth(2, tuple_to_list(now())),
+			       monitor_ref = MonitorRef}.
 
 serve_waiting_pids(Pool) ->
-    {Waiting, Available, Locked} = serve_waiting_pids(Pool#pool.waiting, Pool#pool.available, Pool#pool.locked),
-    Pool#pool{waiting=Waiting, available=Available, locked=Locked}.
+    {Waiting, Available, Locked, NewRefs} = serve_waiting_pids(Pool#pool.waiting, Pool#pool.available, Pool#pool.locked, []),
+    {Pool#pool{waiting=Waiting, available=Available, locked=Locked}, NewRefs}.
 
-serve_waiting_pids(Waiting, Available, Locked) ->
+serve_waiting_pids(Waiting, Available, Locked, MonitorRefs) ->
     case queue:is_empty(Waiting) of
         false ->
-			case lock_next_connection(Available, Locked) of
-				{ok, Connection, OtherAvailable, NewLocked} ->
+		    Who = queue:get(Waiting),
+			case lock_next_connection(Available, Locked, Who) of
+				{ok, Connection, OtherAvailable, NewLocked, NewRef} ->
                     {{value, Pid}, OtherWaiting} = queue:out(Waiting),
-					erlang:send(Pid, {connection, Connection}),
-                    serve_waiting_pids(OtherWaiting, OtherAvailable, NewLocked);
+		    erlang:send(Pid, {connection, Connection}),
+                    serve_waiting_pids(OtherWaiting, OtherAvailable, NewLocked, [NewRef | MonitorRefs]);
 				unavailable ->
-                    {Waiting, Available, Locked}
+                    {Waiting, Available, Locked, MonitorRefs}
             end;
         true ->
-            {Waiting, Available, Locked}
+            {Waiting, Available, Locked, MonitorRefs}
     end.
 
 lock_timeout() ->
     emysql_app:lock_timeout().
-
-%% @doc Execute a function for a specific pool
-%% @end
-with_pool(P, F, #state { pools = Pools } = State) ->
-    case find_pool(P, Pools) of
-        undefined ->
-           {{error, pool_not_found}, State};
-        {Pl, Ps} ->
-           {Reply, UpdatedP} = F(Pl),
-           {Reply, State#state { pools = [UpdatedP | Ps] }}
-    end.

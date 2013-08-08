@@ -236,17 +236,20 @@ reset_connection(Pools, Conn, StayLocked) ->
     %% by the next caller process coming along. So the
     %% pool can't run dry, even though it can freeze.
     %-% io:format("resetting connection~n"),
+    MonitorRef = Conn#emysql_connection.monitor_ref,
     close_connection(Conn),
     %% OPEN NEW SOCKET
     case emysql_conn_mgr:find_pool(Conn#emysql_connection.pool_id, Pools) of
         {Pool, _} ->
             case catch open_connection(Pool) of
                 #emysql_connection{} = NewConn when StayLocked == pass ->
-                    ok = emysql_conn_mgr:replace_connection_as_available(Conn, NewConn),
-                    NewConn;
+                    NewConn2 = add_monitor_ref(NewConn, MonitorRef),
+                    ok = emysql_conn_mgr:replace_connection_as_available(Conn, NewConn2),
+                    NewConn2;
                 #emysql_connection{} = NewConn when StayLocked == keep ->
-                    ok = emysql_conn_mgr:replace_connection_as_locked(Conn, NewConn),
-                    NewConn;
+                    NewConn2 = add_monitor_ref(NewConn, MonitorRef),
+                    ok = emysql_conn_mgr:replace_connection_as_locked(Conn, NewConn2),
+                    NewConn2;
                 {'EXIT', Reason} ->
                     DeadConn = Conn#emysql_connection { alive = false, last_test_time = 0 },
                     emysql_conn_mgr:replace_connection_as_available(Conn, DeadConn),
@@ -255,6 +258,9 @@ reset_connection(Pools, Conn, StayLocked) ->
         undefined ->
             exit(pool_not_found)
     end.
+
+add_monitor_ref(Conn, MonitorRef) ->
+    Conn#emysql_connection{monitor_ref = MonitorRef}.
 
 close_connection(Conn) ->
 	%% garbage collect statements
