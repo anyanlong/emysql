@@ -21,6 +21,8 @@
 
 -record(hello_record, {hello_text}).
 
+-include("../include/emysql.hrl").
+
 %% Optional suite settings
 %%--------------------------------------------------------------------
 %% Function: suite() -> Info
@@ -138,9 +140,26 @@ insert_and_read_back(_) ->
 
 	% the test
 	{result_packet,5,
+<<<<<<< HEAD
                [{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
                        <<"hello_table">>,<<"hello_text">>,<<"hello_text">>,
                        254,<<>>,33,60,0,0, _}],
+=======
+               [#field{seq_num=2, 
+                       catalog= <<"def">>, 
+                       db= <<"hello_database">>,
+                       table= <<"hello_table">>,
+                       org_table= <<"hello_table">>,
+                       name= <<"hello_text">>,
+                       org_name= <<"hello_text">>,
+                       type=254,
+                       default= <<>>,
+                       charset_nr=33,
+                       length=_,
+                       flags=_,
+                       decimals=0,
+                       decoder = _ }],
+>>>>>>> a8866b7... Fix bug on multiple result set. Thanks jesper
                [[<<"Hello World!">>]],
                <<>>} = Result,
     
@@ -219,16 +238,25 @@ select_by_prepared_statement(_) ->
 	ct:log("Result: ~p~n", [Result]),
 
 	% the test
-    {result_packet,5,
-                       [{field,2,<<"def">>,<<"hello_database">>,
-                               <<"hello_table">>,<<"hello_table">>,
-                               <<"hello_text">>,<<"hello_text">>,254,<<>>,33,
-                               60,0,0, _}],
+	{result_packet,5,  
+                    [#field{
+                            seq_num=2,
+                            catalog= <<"def">>,
+                            db= <<"hello_database">>,
+                            table= <<"hello_table">>,
+                            org_table= <<"hello_table">>,
+                            name= <<"hello_text">>,
+                            org_name= <<"hello_text">>,
+                            type=254,
+                            default = <<>>,
+                            charset_nr = 33,
+                            length= _Length,
+                            flags = _Flags,
+                            decimals = 0,
+                            decoder = _Decoder}],
                        [[<<"Hello World!">>]],
                        <<>>} = Result,
-
     ok.
-
 
 
 %% Test Case: Delete a non-existant Stored Procedure
@@ -286,13 +314,23 @@ select_by_stored_procedure(_) ->
 	ct:log("~p~n", [Result3]),
 	
 	% third, main test
+<<<<<<< HEAD
 	[{result_packet,5,
               		[{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
                         <<"hello_table">>,<<"hello_text">>,<<"hello_text">>,
                         254,<<>>,33,60,0,0,_}],
+=======
+	[{result_packet,5, _Fields
+              		,
+>>>>>>> a8866b7... Fix bug on multiple result set. Thanks jesper
                 	[[<<"Hello World!">>]],
                 	<<>>},
 			   {ok_packet,6,0,0,_,0,[]}]
 			   = Result3,
 	
 	ok.
+
+fields() ->
+[{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
+                        <<"hello_table">>,<<"hello_text">>,<<"hello_text">>,
+                        254,<<>>,33,60,0,0}].
