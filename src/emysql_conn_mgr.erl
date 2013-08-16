@@ -134,17 +134,16 @@ do_gen_call(Msg) ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init([]) ->
-    Pools = initialize_pools(),
-    Pools1 = lists:map(
-        fun (Pool) ->
-                case emysql_conn:open_connections(Pool) of
-                    {ok, Pool} -> Pool;
+    Pools = lists:map(
+        fun (Pool1) ->
+                case emysql_conn:open_connections(Pool1) of
+                    {ok, Pool2} -> Pool2;
                     {error, Reason} -> throw(Reason)
                 end
         end,
-        Pools
+        initialize_pools()
     ),
-    {ok, #state{pools=Pools1}}.
+    {ok, #state{pools=Pools}}.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
@@ -325,7 +324,7 @@ initialize_pools() ->
             port = proplists:get_value(port, Props),
             database = proplists:get_value(database, Props),
             encoding = proplists:get_value(encoding, Props),
-            start_cmds = proplists:get_value(start_cmds, Props)
+            start_cmds = proplists:get_value(start_cmds, Props, [])
         } || {PoolId, Props} <- emysql_app:pools()
     ].
 
