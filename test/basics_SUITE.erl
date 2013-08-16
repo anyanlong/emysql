@@ -137,12 +137,12 @@ insert_and_read_back(_) ->
 	ct:log("~p~n", [Result]),
 
 	% the test
-	Result = {result_packet,5,
+	{result_packet,5,
                [{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
                        <<"hello_table">>,<<"hello_text">>,<<"hello_text">>,
-                       254,<<>>,33,60,0,0}],
+                       254,<<>>,33,60,0,0, _}],
                [[<<"Hello World!">>]],
-               <<>>},
+               <<>>} = Result,
     
     ok.
 
@@ -219,13 +219,13 @@ select_by_prepared_statement(_) ->
 	ct:log("Result: ~p~n", [Result]),
 
 	% the test
-	Result = {result_packet,5,
+    {result_packet,5,
                        [{field,2,<<"def">>,<<"hello_database">>,
                                <<"hello_table">>,<<"hello_table">>,
                                <<"hello_text">>,<<"hello_text">>,254,<<>>,33,
-                               60,0,0}],
+                               60,0,0, _}],
                        [[<<"Hello World!">>]],
-                       <<>>},
+                       <<>>} = Result,
 
     ok.
 
@@ -280,8 +280,7 @@ select_by_stored_procedure(_) ->
 	% second test
 	{ok_packet,1,0,0,_,0,[]} = Result2,
 
-	Result3 = emysql:execute(test_pool,
-	   	<<"call sp_hello();">>),
+	Result3 = emysql:execute(test_pool,	<<"call sp_hello();">>),
 
 	% find this output by clicking on the test name, then case name in test/index.html
 	ct:log("~p~n", [Result3]),
@@ -290,7 +289,7 @@ select_by_stored_procedure(_) ->
 	[{result_packet,5,
               		[{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
                         <<"hello_table">>,<<"hello_text">>,<<"hello_text">>,
-                        254,<<>>,33,60,0,0}],
+                        254,<<>>,33,60,0,0,_}],
                 	[[<<"Hello World!">>]],
                 	<<>>},
 			   {ok_packet,6,0,0,_,0,[]}]
