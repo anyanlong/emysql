@@ -124,7 +124,7 @@ open_n_connections(PoolId, N) ->
                     {'EXIT', Reason} ->
                         {Conns, [Reason | Reasons]}
                 end
-            end, [], lists:seq(1, N));
+            end, {[], []}, lists:seq(1, N));
         _ ->
             exit(pool_not_found)
     end.
