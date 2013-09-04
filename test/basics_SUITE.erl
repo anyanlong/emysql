@@ -141,11 +141,6 @@ insert_and_read_back(_) ->
 
 	% the test
 	{result_packet,5,
-<<<<<<< HEAD
-               [{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
-                       <<"hello_table">>,<<"hello_text">>,<<"hello_text">>,
-                       254,<<>>,33,60,0,0, _}],
-=======
                [#field{seq_num=2, 
                        catalog= <<"def">>, 
                        db= <<"hello_database">>,
@@ -160,7 +155,6 @@ insert_and_read_back(_) ->
                        flags=_,
                        decimals=0,
                        decoder = _ }],
->>>>>>> a8866b7... Fix bug on multiple result set. Thanks jesper
                [[<<"Hello World!">>]],
                <<>>} = Result,
     
@@ -365,23 +359,11 @@ select_by_stored_procedure(_) ->
 	ct:log("~p~n", [Result3]),
 	
 	% third, main test
-<<<<<<< HEAD
-	[{result_packet,5,
-              		[{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
-                        <<"hello_table">>,<<"hello_text">>,<<"hello_text">>,
-                        254,<<>>,33,60,0,0,_}],
-=======
-	[{result_packet,5, _Fields
-              		,
->>>>>>> a8866b7... Fix bug on multiple result set. Thanks jesper
-                	[[<<"Hello World!">>]],
-                	<<>>},
-			   {ok_packet,6,0,0,_,0,[]}]
-			   = Result3,
+	[{result_packet,5, _Fields, [[<<"Hello World!">>]], <<>>}, {ok_packet,6,0,0,_,0,[]}] = Result3,
 	
 	ok.
 
 fields() ->
-[{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
+    [{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
                         <<"hello_table">>,<<"hello_text">>,<<"hello_text">>,
                         254,<<>>,33,60,0,0}].
