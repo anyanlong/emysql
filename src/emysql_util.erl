@@ -86,14 +86,14 @@ as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when is_list(_Cols),
     [];
 as_proplist(Res = #result_packet{field_list=Cols,rows=Vals}) when is_list(Cols), 
 								  is_list(Vals) ->
-    FieldData = emysql_util:field_names(Res),
+    FieldData = field_names(Res),
     RowData = case lists:flatten(Vals) of
 		  [] ->
 		      array:to_list(array:new([erlang:length(FieldData)]));
 		  Data ->
 		      Data
 	      end,
-    emysql_util:dualmap(fun(A,B)->{A,B} end, FieldData, RowData).
+    dualmap(fun(A,B)->{A,B} end, FieldData, RowData).
 
 %% @spec as_record(Result, RecordName, Fields, Fun) -> Result
 %%      Result = #result_packet{}
@@ -139,7 +139,7 @@ as_record(Result, RecordName, Fields) when is_record(Result, result_packet), is_
 %% @spec as_json(Result) -> Result
 %% @doc package row data as erlang json (jsx/jiffy compatible)
 as_json(#result_packet { rows = Rows } = Result) ->
-    Fields = emysql_util:field_names(Result),
+    Fields = field_names(Result),
     [begin
         [{K, json_val(V)} || {K, V} <- lists:zip(Fields, Row)]
     end || Row <- Rows].
