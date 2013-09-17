@@ -28,10 +28,12 @@
 -export([
          asciz/1,
          as_dict/1,
-         as_json/1,
          as_proplist/1,
          as_record/3,
          as_record/4,
+         as_json/1,
+         insert_id/1,
+         affected_rows/1,
          bxor_binary/2,
          dualmap/3,
          encode/1,
@@ -205,6 +207,14 @@ asciz_binary(<<0:8, Rest/binary>>, Acc) ->
     {lists:reverse(Acc), Rest};
 asciz_binary(<<C:8, Rest/binary>>, Acc) ->
     asciz_binary(Rest, [C | Acc]).
+
+%% @spec insert_id(ok_packet()) -> integer() | binary().
+insert_id(#ok_packet{insert_id=ID}) ->
+    ID.
+
+%% @spec affected_rows(ok_packet()) -> integer().
+affected_rows(#ok_packet{affected_rows=Rows}) ->
+    Rows.
 
 bxor_binary(B1, B2) ->
     list_to_binary(dualmap(fun (E1, E2) -> E1 bxor E2 end, binary_to_list(B1), binary_to_list(B2))).

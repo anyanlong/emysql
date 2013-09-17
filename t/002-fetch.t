@@ -25,7 +25,7 @@ main(_) ->
 	
 	[begin
 		Abc = emysql:execute(test1, "INSERT INTO foo (name) VALUES ('abc" ++ integer_to_list(I) ++ "')"),
-		etap:is(Abc#ok_packet.insert_id, I, "auto increment value ok")
+		etap:is(emysql_util:insert_id(Abc), I, "auto increment value ok")
 	 end || I <- lists:seq(1,5)],
 
 	AllFoo = emysql:execute(test1, "SELECT * FROM foo"),
