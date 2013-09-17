@@ -1,3 +1,4 @@
+%% vim: ts=4 sw=4 et
 %% Copyright (c) 2009
 %% Bill Warnecke <bill@rupture.com>
 %% Jacob Vorreuter <jacob.vorreuter@gmail.com>
@@ -76,23 +77,23 @@ as_dict(Res = #result_packet{}) ->
 %%  Res = emysql:execute(pool1, "select * from foo"),
 %%  Res:as_proplist(Res).
 as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when _Cols =:= undefined, 
-							      _Vals =:= undefined ->
+                                                              _Vals =:= undefined ->
     [];
 as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when is_list(_Cols), 
-								  _Vals =:= undefined ->
+                                                              _Vals =:= undefined ->
     [];
 as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when is_list(_Cols), 
-								  _Vals =:= [] ->
+                                                              _Vals =:= [] ->
     [];
 as_proplist(Res = #result_packet{field_list=Cols,rows=Vals}) when is_list(Cols), 
-								  is_list(Vals) ->
+                                                              is_list(Vals) ->
     FieldData = field_names(Res),
     RowData = case lists:flatten(Vals) of
-		  [] ->
-		      array:to_list(array:new([erlang:length(FieldData)]));
-		  Data ->
-		      Data
-	      end,
+          [] ->
+              array:to_list(array:new([erlang:length(FieldData)]));
+          Data ->
+              Data
+          end,
     dualmap(fun(A,B)->{A,B} end, FieldData, RowData).
 
 %% @spec as_record(Result, RecordName, Fields, Fun) -> Result
@@ -114,24 +115,24 @@ as_proplist(Res = #result_packet{field_list=Cols,rows=Vals}) when is_list(Cols),
 %%  Res = emysql:execute(pool1, "select * from foo"),
 %%  Res:as_record(foo, record_info(fields, foo)).
 as_record(Result, RecordName, Fields, Fun) when is_record(Result, result_packet), is_atom(RecordName), is_list(Fields), is_function(Fun) ->
-	Columns = Result#result_packet.field_list,
+    Columns = Result#result_packet.field_list,
 
-	S = lists:seq(1, length(Columns)),
-	P = lists:zip([ binary_to_atom(C1#field.name, utf8) || C1 <- Columns ], S),
-	F = fun(FieldName) ->
-		case proplists:lookup(FieldName, P) of
-			none ->
-					fun(_) -> undefined end;
-			{FieldName, Pos} ->
-					fun(Row) -> lists:nth(Pos, Row) end
-		end
-	end,
-	Fs = [ F(FieldName) || FieldName <- Fields ],
-	F1 = fun(Row) ->
-		RecordData = [ Fx(Row) || Fx <- Fs ],
-		Fun(list_to_tuple([RecordName|RecordData]))
-	end,
-	[ F1(Row) || Row <- Result#result_packet.rows ].
+    S = lists:seq(1, length(Columns)),
+    P = lists:zip([ binary_to_atom(C1#field.name, utf8) || C1 <- Columns ], S),
+    F = fun(FieldName) ->
+        case proplists:lookup(FieldName, P) of
+            none ->
+                    fun(_) -> undefined end;
+            {FieldName, Pos} ->
+                    fun(Row) -> lists:nth(Pos, Row) end
+        end
+    end,
+    Fs = [ F(FieldName) || FieldName <- Fields ],
+    F1 = fun(Row) ->
+        RecordData = [ Fx(Row) || Fx <- Fs ],
+        Fun(list_to_tuple([RecordName|RecordData]))
+    end,
+    [ F1(Row) || Row <- Result#result_packet.rows ].
 
 as_record(Result, RecordName, Fields) when is_record(Result, result_packet), is_atom(RecordName), is_list(Fields) ->
     as_record(Result, RecordName, Fields, fun(A) -> A end).
