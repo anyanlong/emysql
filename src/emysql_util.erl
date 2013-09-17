@@ -26,20 +26,20 @@
 %% OTHER DEALINGS IN THE SOFTWARE.
 -module(emysql_util).
 -export([
+         affected_rows/1,
          asciz/1,
          as_dict/1,
+         as_json/1,
          as_proplist/1,
          as_record/3,
          as_record/4,
-         as_json/1,
-         insert_id/1,
-         affected_rows/1,
          bxor_binary/2,
          dualmap/3,
          encode/1,
          encode/2,
          field_names/1,
          hash/1,
+         insert_id/1,
          length_coded_binary/1,
          length_coded_string/1,
          null_terminated_string/2,
@@ -52,7 +52,7 @@
 
 -include("emysql.hrl").
 
-field_names(Result) when is_record(Result, result_packet) ->
+field_names(Result = #result_packet{}) ->
     [Field#field.name || Field <- Result#result_packet.field_list].
 
 %% @spec as_dict(Result) -> dict
@@ -116,7 +116,7 @@ as_proplist(Res = #result_packet{field_list=Cols,rows=Vals}) when is_list(Cols),
 %% fetch_foo() ->
 %%  Res = emysql:execute(pool1, "select * from foo"),
 %%  Res:as_record(foo, record_info(fields, foo)).
-as_record(Result, RecordName, Fields, Fun) when is_record(Result, result_packet), is_atom(RecordName), is_list(Fields), is_function(Fun) ->
+as_record(Result = #result_packet{}, RecordName, Fields, Fun) when is_atom(RecordName), is_list(Fields), is_function(Fun) ->
     Columns = Result#result_packet.field_list,
 
     S = lists:seq(1, length(Columns)),
@@ -136,7 +136,7 @@ as_record(Result, RecordName, Fields, Fun) when is_record(Result, result_packet)
     end,
     [ F1(Row) || Row <- Result#result_packet.rows ].
 
-as_record(Result, RecordName, Fields) when is_record(Result, result_packet), is_atom(RecordName), is_list(Fields) ->
+as_record(Result = #result_packet{}, RecordName, Fields) when is_atom(RecordName), is_list(Fields) ->
     as_record(Result, RecordName, Fields, fun(A) -> A end).
 
 %% @spec as_json(Result) -> Result
