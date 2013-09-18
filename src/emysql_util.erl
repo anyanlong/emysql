@@ -53,8 +53,8 @@
 
 -include("emysql.hrl").
 
-field_names(Result = #result_packet{}) ->
-    [Field#field.name || Field <- Result#result_packet.field_list].
+field_names(#result_packet{field_list=FieldList}) ->
+    [Field#field.name || Field <- FieldList].
 
 %% @spec as_dict(Result) -> dict
 %%      Result = #result_packet{}
