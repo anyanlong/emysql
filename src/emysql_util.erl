@@ -89,14 +89,14 @@ as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when is_list(_Cols),
                                                               _Vals =:= [] ->
     [];
 as_proplist(Res = #result_packet{field_list=Cols,rows=Vals}) when is_list(Cols), 
-                                                              is_list(Vals) ->
+                                                                  is_list(Vals) ->
     FieldData = field_names(Res),
     RowData = case lists:flatten(Vals) of
-          [] ->
-              array:to_list(array:new([erlang:length(FieldData)]));
-          Data ->
-              Data
-          end,
+        [] ->
+            lists:duplicate(length(FieldData), undefined);
+        Data ->
+            Data
+    end,
     dualmap(fun(A,B)->{A,B} end, FieldData, RowData).
 
 %% @spec as_record(Result, RecordName, Fields, Fun) -> Result
