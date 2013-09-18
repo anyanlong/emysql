@@ -44,6 +44,7 @@
          length_coded_string/1,
          null_terminated_string/2,
          quote/1,
+         result_type/1,
          rnd/3,
          to_binary/1,
          test_u/0,
@@ -356,6 +357,11 @@ quote_loop([26 | Rest], Acc) ->
 
 quote_loop([C | Rest], Acc) ->
     quote_loop(Rest, [C | Acc]).
+
+result_type(#ok_packet{})     -> ok;
+result_type(#result_packet{}) -> result;
+result_type(#error_packet{})  -> error;
+result_type(#eof_packet{})    -> eof.
 
 %% UTF-8 is designed in such a way that ISO-latin-1 characters with
 %% numbers beyond the 7-bit ASCII range are seldom considered valid
