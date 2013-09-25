@@ -422,8 +422,13 @@ serve_waiting_pids(Waiting, Available, Locked, MonitorRefs) ->
 			case lock_next_connection(Available, Locked, Who) of
 				{ok, Connection, OtherAvailable, NewLocked, NewRef} ->
                     {{value, Pid}, OtherWaiting} = queue:out(Waiting),
-		    erlang:send(Pid, {connection, Connection}),
-                    serve_waiting_pids(OtherWaiting, OtherAvailable, NewLocked, [NewRef | MonitorRefs]);
+                    case erlang:is_process_alive(Pid) of
+                        true ->
+                            erlang:send(Pid, {connection, Connection}),
+                            serve_waiting_pids(OtherWaiting, OtherAvailable, NewLocked, [NewRef | MonitorRefs]);
+                        _    ->
+                            serve_waiting_pids(OtherWaiting, Available, Locked, MonitorRefs)
+                    end;
 				unavailable ->
                     {Waiting, Available, Locked, MonitorRefs}
             end;
