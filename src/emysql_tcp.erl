@@ -239,8 +239,8 @@ recv_row_data(Socket, FieldList, DefaultTimeout, SeqNum, Buff) ->
 
 recv_row_data(Socket, FieldList, Timeout, SeqNum, Buff, Acc) ->
        case parse_buffer(FieldList,Buff, Acc) of
-                {ok, NotParsed, NewAcc} ->
-                    case gen_tcp:recv(Socket, 0, Timeout) of
+                {ok, NotParsed, NewAcc, Missing} ->
+                    case gen_tcp:recv(Socket, Missing, Timeout) of
                         {ok, Data} ->
                             recv_row_data(Socket, FieldList, Timeout, SeqNum+1,  <<NotParsed/binary, Data/binary>>, NewAcc);
                         {error, Reason} ->
@@ -260,8 +260,16 @@ parse_buffer(FieldList,<<PacketLength:24/little-integer, SeqNum:8/integer, Packe
             Row = decode_row_data(PacketData, FieldList),
             parse_buffer(FieldList,Rest, [Row|Acc])
     end;
+parse_buffer(_FieldList, Buff = <<PacketLength:24/little-integer, _SeqNum:8/integer, PacketData/binary>>, Acc) ->
+    Missing = PacketLength - size(PacketData),
+    if
+        Missing =< ?TCP_RECV_BUFFER ->
+            {ok, Buff, Acc, 0};
+        true ->
+            {ok, Buff, Acc, Missing}
+    end;
 parse_buffer(_FieldList,Buff, Acc) ->
-    {ok, Buff, Acc}.
+    {ok, Buff, Acc, 0}.
 
 decode_row_data(<<>>, []) ->
     [];
