@@ -260,8 +260,14 @@ parse_buffer(FieldList,<<PacketLength:24/little-integer, SeqNum:8/integer, Packe
             Row = decode_row_data(PacketData, FieldList),
             parse_buffer(FieldList,Rest, [Row|Acc])
     end;
-parse_buffer(FieldList, Buff = <<PacketLength:24/little-integer, _SeqNum:8/integer, PacketData/binary>>, Acc) ->
-    {ok, Buff, Acc, PacketLength - size(PacketData)};
+parse_buffer(_FieldList, Buff = <<PacketLength:24/little-integer, _SeqNum:8/integer, PacketData/binary>>, Acc) ->
+    Missing = PacketLength - size(PacketData),
+    if
+        Missing =< ?TCP_RECV_BUFFER ->
+            {ok, Buff, Acc, 0};
+        true ->
+            {ok, Buff, Acc, Missing}
+    end;
 parse_buffer(_FieldList,Buff, Acc) ->
     {ok, Buff, Acc, 0}.
 
