@@ -7,10 +7,13 @@ CRYPTO_PATH=/opt/local/var/macports/software/erlang/R14A_0/opt/local/lib/erlang/
 MODULES=$(shell ls -1 src/*.erl | awk -F[/.] '{ print $$2 }' | sed '$$q;s/$$/,/g')
 MAKETIME=$(shell date)
 
-all: app
+all: crypto_compat app
 	(cd src;$(MAKE))
 
 app: ebin/$(PKGNAME).app
+
+crypto_compat:
+	(escript support/crypto_compat.escript)
 
 ebin/$(PKGNAME).app: src/$(PKGNAME).app.src
 	mkdir -p ebin
@@ -55,6 +58,7 @@ clean:
 	rm -f variables-ct*
 	rm -f *.beam
 	rm -f *.html
+	rm -f include/crypto_compat.hrl
 
 package: clean
 	@mkdir $(PKGNAME)-$(VERSION)/ && cp -rf ebin include Makefile README src support t $(PKGNAME)-$(VERSION)
