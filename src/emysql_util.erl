@@ -67,7 +67,7 @@ field_names(#result_packet{field_list=FieldList}) ->
 %%  Res = emysql:execute(pool1, "select * from foo"),
 %%  Res:as_dict(Res).
 as_dict(Res = #result_packet{}) ->
-    dict:from_list(as_proplist(Res)).
+    dict:from_list(lists:flatten(as_proplist(Res))).
 
 %% @spec as_proplist(Result) -> proplist
 %%      Result = #result_packet{}
