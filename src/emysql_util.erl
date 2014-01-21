@@ -68,7 +68,7 @@ field_names(#result_packet{field_list=FieldList}) ->
 %%  Res:as_dict(Res).
 as_dict(Res = #result_packet{}) ->
     dict:from_list(as_proplist(Res)).
- 
+
 %% @spec as_proplist(Result) -> proplist
 %%      Result = #result_packet{}
 %%
@@ -79,25 +79,21 @@ as_dict(Res = #result_packet{}) ->
 %% fetch_foo() ->
 %%  Res = emysql:execute(pool1, "select * from foo"),
 %%  Res:as_proplist(Res).
-as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when _Cols =:= undefined, 
+as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when _Cols =:= undefined,
                                                               _Vals =:= undefined ->
     [];
-as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when is_list(_Cols), 
+as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when is_list(_Cols),
                                                               _Vals =:= undefined ->
     [];
-as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when is_list(_Cols), 
+as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when is_list(_Cols),
                                                               _Vals =:= [] ->
     [];
-as_proplist(Res = #result_packet{field_list=Cols,rows=Vals}) when is_list(Cols), 
+as_proplist(Res = #result_packet{field_list=Cols,rows=Vals}) when is_list(Cols),
                                                                   is_list(Vals) ->
-    FieldData = field_names(Res),
-    RowData = case lists:flatten(Vals) of
-        [] ->
-            lists:duplicate(length(FieldData), undefined);
-        Data ->
-            Data
-    end,
-    dualmap(fun(A,B)->{A,B} end, FieldData, RowData).
+    Fields = field_names(Res),
+    [begin
+        [{K, V} || {K, V} <- lists:zip(Fields, Val)]
+    end || Val <- Vals].
 
 %% @spec as_record(Result, RecordName, Fields, Fun) -> Result
 %%      Result = #result_packet{}
@@ -272,7 +268,7 @@ encode(Val, list) when is_binary(Val) ->
     quote(binary_to_list(Val));
 encode(Val, binary) when is_atom(Val) ->
     encode(atom_to_list(Val), binary);
-encode(Val, binary) when is_list(Val) -> 
+encode(Val, binary) when is_list(Val) ->
     list_to_binary(quote(Val));
 encode(Val, binary) when is_binary(Val) ->
     list_to_binary(quote(binary_to_list(Val)));
