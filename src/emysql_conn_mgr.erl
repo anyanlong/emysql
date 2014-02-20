@@ -32,7 +32,7 @@
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2]).
 -export([terminate/2, code_change/3]).
 
--export([pools/0, add_pool/1, remove_pool/1,
+-export([pools/0, add_pool/1, has_pool/1,remove_pool/1,
         add_connections/2, remove_connections/2,
         lock_connection/1, wait_for_connection/1, wait_for_connection/2,
         pass_connection/1, replace_connection_as_locked/2, replace_connection_as_available/2,
@@ -57,6 +57,9 @@ pools() ->
 
 add_pool(Pool) ->
     do_gen_call({add_pool, Pool}).
+
+has_pool(Pool) ->
+    do_gen_call({has_pool, Pool}).
 
 remove_pool(PoolId) ->
     do_gen_call({remove_pool, PoolId}).
@@ -156,6 +159,14 @@ init([]) ->
 %%--------------------------------------------------------------------
 handle_call(pools, _From, State) ->
     {reply, State#state.pools, State};
+
+handle_call({has_pool, PoolID}, _From, State) ->
+    case find_pool(PoolID, State#state.pools) of
+        {_, _} ->
+            {reply, true, State};
+        undefined ->
+            {reply, false, State}
+    end;
 
 handle_call({add_pool, Pool}, _From, State) ->
     case find_pool(Pool#pool.pool_id, State#state.pools) of

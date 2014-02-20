@@ -222,22 +222,29 @@ add_pool(PoolId, Size, User, Passwd, Host, Port, DB, Encoding, StartCmds)
        is_list(DB) orelse DB == undefined,
        is_atom(Encoding),
        is_list(StartCmds) ->
-    Pool = #pool{
-        pool_id = PoolId,
-        size = Size,
-        user = User,
-        password = Passwd,
-        host = Host,
-        port = Port,
-        database = DB,
-        encoding = Encoding,
-        start_cmds = StartCmds
-    },
-    Pool2 = case emysql_conn:open_connections(Pool) of
-        {ok, Pool1} -> Pool1;
-        {error, Reason} -> throw(Reason)
-    end,
-    emysql_conn_mgr:add_pool(Pool2).
+    case emysql_conn_mgr:has_pool(PoolId) of
+        true -> 
+            io:format("hejtja~n"),
+            {error,pool_already_exists};
+        false ->
+            io:format("hejtoj~n"),
+            Pool = #pool{
+                    pool_id = PoolId,
+                    size = Size,
+                    user = User,
+                    password = Passwd,
+                    host = Host,
+                    port = Port,
+                    database = DB,
+                    encoding = Encoding,
+                    start_cmds = StartCmds
+                    },
+            Pool2 = case emysql_conn:open_connections(Pool) of
+                {ok, Pool1} -> Pool1;
+                {error, Reason} -> throw(Reason)
+            end,
+            emysql_conn_mgr:add_pool(Pool2)
+    end.
 
 %% @spec remove_pool(PoolId) -> ok
 %%      PoolId = atom()
