@@ -224,10 +224,8 @@ add_pool(PoolId, Size, User, Passwd, Host, Port, DB, Encoding, StartCmds)
        is_list(StartCmds) ->
     case emysql_conn_mgr:has_pool(PoolId) of
         true -> 
-            io:format("hejtja~n"),
             {error,pool_already_exists};
         false ->
-            io:format("hejtoj~n"),
             Pool = #pool{
                     pool_id = PoolId,
                     size = Size,
