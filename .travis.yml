@@ -7,11 +7,8 @@ before_script:
 # once #89 is closed, this should be replaced by 'make all-test'
 script: "make test"
 otp_release:
+   - 17.0-rc1
+   - R16B03-1
    - R16B
    - R15B03
-   - R15B02
-   - R15B01
-   - R15B
    - R14B04
-   - R14B03
-   - R14B02
