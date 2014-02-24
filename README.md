@@ -1,5 +1,7 @@
 ## Emysql 0.3.0
 
+[![Build Status](https://travis-ci.org/Eonblast/Emysql.png?branch=master)](https://travis-ci.org/Eonblast/Emysql)
+
 <hr/>
 
 *Note:* Automatic conversion to the encoding of the underlying MySQL
