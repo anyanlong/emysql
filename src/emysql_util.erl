@@ -79,21 +79,21 @@ as_dict(Res = #result_packet{}) ->
 %% fetch_foo() ->
 %%  Res = emysql:execute(pool1, "select * from foo"),
 %%  Res:as_proplist(Res).
-as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when _Cols =:= undefined,
-                                                              _Vals =:= undefined ->
+as_proplist(#result_packet{field_list=_Cols,rows=_Rows}) when _Cols =:= undefined,
+                                                              _Rows =:= undefined ->
     [];
-as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when is_list(_Cols),
-                                                              _Vals =:= undefined ->
+as_proplist(#result_packet{field_list=_Cols,rows=_Rows}) when is_list(_Cols),
+                                                              _Rows =:= undefined ->
     [];
-as_proplist(#result_packet{field_list=_Cols,rows=_Vals}) when is_list(_Cols),
-                                                              _Vals =:= [] ->
+as_proplist(#result_packet{field_list=_Cols,rows=_Rows}) when is_list(_Cols),
+                                                              _Rows =:= [] ->
     [];
-as_proplist(Res = #result_packet{field_list=Cols,rows=Vals}) when is_list(Cols),
-                                                                  is_list(Vals) ->
+as_proplist(Res = #result_packet{field_list=Cols,rows=Rows}) when is_list(Cols),
+                                                                  is_list(Rows) ->
     Fields = field_names(Res),
     [begin
-        [{K, V} || {K, V} <- lists:zip(Fields, Val)]
-    end || Val <- Vals].
+        [{K, V} || {K, V} <- lists:zip(Fields, R)]
+    end || R <- Rows].
 
 %% @spec as_record(Result, RecordName, Fields, Fun) -> Result
 %%      Result = #result_packet{}

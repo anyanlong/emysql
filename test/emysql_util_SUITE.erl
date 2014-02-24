@@ -90,6 +90,7 @@ proplist_multi_test(_) ->
      {<<"ByeField">>,<<"Bye">>}
     ] 
 	=:= emysql_util:as_proplist(get_multi_test()).
+
 %% Test Cases: Test if emysql_util:as_record/3 works
 %%--------------------------------------------------------------------
 %% this test is from a previous author and imported here
