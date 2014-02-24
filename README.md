@@ -1,5 +1,7 @@
 # Emysql
 
+[![Build Status](https://travis-ci.org/Eonblast/Emysql.png?branch=master)](https://travis-ci.org/Eonblast/Emysql)
+
 Emysql implements a stable driver toward the MySQL database. It currently support fairly recent versions (somewhere around 5.3+) and it is considered fairly stable in production.
 
 The driver has several technical shortcomings:
@@ -26,8 +28,6 @@ Semantic versioning is used. Versions are given as `x.y.z`:
 * Tried to consolidate simple parts of the driver
 
 ## Emysql 0.3.0
-
-[![Build Status](https://travis-ci.org/Eonblast/Emysql.png?branch=master)](https://travis-ci.org/Eonblast/Emysql)
 
 <hr/>
 
