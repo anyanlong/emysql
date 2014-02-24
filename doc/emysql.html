@@ -10,7 +10,7 @@
 <hr>
 
 <h1>Module emysql</h1>
-<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>The main Emysql module.
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>The main Emysql module.
 
 
 <h2><a name="description">Description</a></h2><p>The main Emysql module.</p>
@@ -71,15 +71,22 @@ asynchronously handle the execution.</p>
  
   The pool-related functions execute brief operations using the primitive
   functions exported by <code>emysql_conn_mgr</code> and <code>emysql_conn_mgr</code>.
+<h2><a name="types">Data Types</a></h2>
+
+<h3 class="typedecl"><a name="type-state">state()</a></h3>
+<p><tt>state() = any()</tt></p>
+
+
 <h2><a name="index">Function Index</a></h2>
 <table width="100%" class=index border="0" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#add_pool-8">add_pool/8</a></td><td>Synchronous call to the connection manager to add a pool.</td></tr>
+<tr><td valign="top"><a href="#add_pool-9">add_pool/9</a></td><td></td></tr>
 <tr><td valign="top"><a href="#decrement_pool_size-2">decrement_pool_size/2</a></td><td>Synchronous call to the connection manager to shrink a pool.</td></tr>
 <tr><td valign="top"><a href="#default_timeout-0">default_timeout/0</a></td><td>Returns the default timeout in milliseconds.</td></tr>
 <tr><td valign="top"><a href="#execute-2">execute/2</a></td><td>Execute a query, prepared statement or a stored procedure.</td></tr>
 <tr><td valign="top"><a href="#execute-3">execute/3</a></td><td>Execute a query, prepared statement or a stored procedure.</td></tr>
 <tr><td valign="top"><a href="#execute-4">execute/4</a></td><td>Execute a query, prepared statement or a stored procedure.</td></tr>
 <tr><td valign="top"><a href="#execute-5">execute/5</a></td><td>Execute a query, prepared statement or a stored procedure - but return immediately, returning the atom 'unavailable', when no connection in the pool is readily available without wait.</td></tr>
-<tr><td valign="top"><a href="#increment_pool_size-2">increment_pool_size/2</a></td><td>Synchronous call to the connection manager to enlarge a pool.</td></tr>
+<tr><td valign="top"><a href="#increment_pool_size-2">increment_pool_size/2</a></td><td></td></tr>
 <tr><td valign="top"><a href="#prepare-2">prepare/2</a></td><td>Prepare a statement.</td></tr>
 <tr><td valign="top"><a href="#remove_pool-1">remove_pool/1</a></td><td>Synchronous call to the connection manager to remove a pool.</td></tr>
 <tr><td valign="top"><a href="#start-0">start/0</a></td><td>Start the Emysql application.</td></tr>
@@ -90,8 +97,7 @@ asynchronously handle the execution.</p>
 
 <h3 class="function"><a name="add_pool-8">add_pool/8</a></h3>
 <div class="spec">
-<p><tt>add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding) -&gt; Result</tt>
-<ul class="definitions"><li><tt>PoolId = atom()</tt></li><li><tt>Size = integer()</tt></li><li><tt>User = string()</tt></li><li><tt>Password = string()</tt></li><li><tt>Host = string()</tt></li><li><tt>Port = integer()</tt></li><li><tt>Database = string()</tt></li><li><tt>Encoding = string()</tt></li><li><tt>Result = {reply, {error, pool_already_exists}, <a href="#type-state">state()</a>} | {reply, ok, <a href="#type-state">state()</a>}</tt></li></ul></p>
+<p><tt>add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding) -&gt; any()</tt></p>
 </div><p><p>Synchronous call to the connection manager to add a pool.</p>
  
   <h4><a name="Implementation">Implementation</a></h4>
@@ -99,6 +105,12 @@ asynchronously handle the execution.</p>
   Creates a pool record, opens n=Size connections and calls
   emysql_conn_mgr:add_pool() to make the pool known to the pool management.
   emysql_conn_mgr:add_pool() is translated into a blocking gen-server call.</p>
+
+<h3 class="function"><a name="add_pool-9">add_pool/9</a></h3>
+<div class="spec">
+<p><tt>add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds) -&gt; Result</tt>
+<ul class="definitions"><li><tt>PoolId = atom()</tt></li><li><tt>Size = integer()</tt></li><li><tt>User = string()</tt></li><li><tt>Password = string()</tt></li><li><tt>Host = string()</tt></li><li><tt>Port = integer()</tt></li><li><tt>Database = string()</tt></li><li><tt>Encoding = utf8 | latin1</tt></li><li><tt>StartCmds = [binary()]</tt></li><li><tt>Result = {reply, {error, pool_already_exists}, <a href="#type-state">state()</a>} | {reply, ok, <a href="#type-state">state()</a>}</tt></li></ul></p>
+</div>
 
 <h3 class="function"><a name="decrement_pool_size-2">decrement_pool_size/2</a></h3>
 <div class="spec">
@@ -209,20 +221,8 @@ Timeout is the query timeout in milliseconds.</p>
 
 <h3 class="function"><a name="increment_pool_size-2">increment_pool_size/2</a></h3>
 <div class="spec">
-<p><tt>increment_pool_size(PoolId, Num::By) -&gt; Result</tt>
-<ul class="definitions"><li><tt>PoolId = atom()</tt></li><li><tt>By = integer()</tt></li><li><tt>Result = {reply, ok, State1} | {reply, {error, pool_not_found}, State}</tt></li></ul></p>
-</div><p><p>Synchronous call to the connection manager to enlarge a pool.</p>
- 
-  <p>This opens n=By new connections and adds them to the pool of id PoolId.</p>
- 
-  <h4><a name="Implementation">Implementation</a></h4>
- 
-  <p>Opens connections and then adds them to the pool by a call to  
-emysql_conn_mgr:add_connections().</p>
- 
-  That this function exposes the State and possibly pool_not_found
-  seems to be inconsistent with decrement_pool_size(), which invariably
-  returns 'ok'.</p>
+<p><tt>increment_pool_size(PoolId::atom(), Num::non_neg_integer()) -&gt; ok | {error, list()}</tt><br></p>
+</div>
 
 <h3 class="function"><a name="prepare-2">prepare/2</a></h3>
 <div class="spec">
@@ -347,6 +347,6 @@ affected.</p>
 <hr>
 
 <div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
-<p><i>Generated by EDoc, Jun 21 2013, 11:14:51.</i></p>
+<p><i>Generated by EDoc, Feb 24 2014, 16:02:42.</i></p>
 </body>
 </html>

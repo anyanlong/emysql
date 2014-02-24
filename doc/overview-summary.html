@@ -143,7 +143,17 @@ This is a hello world program. Follow the three steps below to try it out.
 
 <p>Emysql uses a sophisticated connection pooling mechanism.</p>
 
-<pre> emysql:add_pool(my_pool, 1, "myuser", "mypass", "myhost", 3306, "mydatabase", utf8).</pre>
+<pre> emysql:add_pool(my_pool, 1, "myuser", "mypass", "myhost", 3306,</pre><p>      
+"mydatabase", utf8).</p>
+
+<p>Arbitrary post-connection start-up commands can be added as a list of binaries
+to the last <code>emysql:add_pool/9</code> argument:</p>
+
+<pre> emysql:add_pool(my_pool, 1, "myuser", "mypass", "myhost", 3306,</pre><p>
+      "mydatabase", utf8, [
+          «"SET TIME_ZONE='+00:00'"»,
+          «"SET SQL_MODE='STRICT_ALL_TABLES'"»      
+]).</p>
 
 <h4><a name="Running_Hello_World">Running Hello World</a></h4>
 
@@ -233,17 +243,20 @@ or (after building emysql.app and the database, as explained above), start a_hel
  % Host = string()  
  % Port = integer()  
  % Database = string()  
- % Encoding = atom()  
+ % Encoding = undefined | atom()
  
  emysql:add_pool(mypoolname, 1, "username", "mypassword", "localhost", 3306, "mydatabase", utf8).</pre>
 
-<h5><a name="More_Record_Types">More Record Types</a></h5>
+  <p>If <code>&lt;code&gt;Encoding&lt;/code&gt;&lt;code&gt; is &lt;/code&gt;&lt;code&gt;undefined&lt;/code&gt;`, then no encoding is set.
 
-<pre> -record(result_packet, {seq_num, field_list, rows, extra}).
+==== More Record Types ====
+
+```
+ -record(result_packet, {seq_num, field_list, rows, extra}).
  
  -record(ok_packet, {seq_num, affected_rows, insert_id, status, warning_count, msg}).
  
- -record(error_packet, {seq_num, code, msg}).</pre>
+ -record(error_packet, {seq_num, code, msg}).</code>''</p>
 
 <p>For other record types, see include/emysql.hrl.</p>
 
@@ -313,6 +326,19 @@ or (after building emysql.app and the database, as explained above), start a_hel
     [begin
  	  io:format("foo: ~p, ~p, ~p~n", [Foo#foo.bar, Foo#foo.baz, Foo#foo.bat])
      end || Foo &lt;- Recs].</pre>
+
+<h5><a name="Converting_Row_Data_To_JSON">Converting Row Data To JSON</a></h5>
+
+<pre> % emysql_util:as_json(ResultPacket) -&gt; Result
+ % Result = [json()]</pre>
+
+<pre> Result = emysql:execute(pool1, &lt;&lt;"select bar, baz from foo"&gt;&gt;),</pre>
+
+<pre> JSON = emysql_util:as_json(Result).
+ #[[{&lt;&lt;"bar"&gt;&gt;,&lt;&lt;"bar_value"&gt;&gt;}, {&lt;&lt;"baz"&gt;&gt;,&lt;&lt;"baz_value"&gt;&gt;}], ...]</pre>
+
+<p>Note that you are getting back a list of erlang terms in accordance with EEP-18.
+For actual utf8 binary JSON string you will need external library like <a href="https://github.com/talentdeficit/jsx">jsx</a> or [jiffy](https://github.com/davisp/jiffy)</p>
 
 <h5><a name="Loading_Data_From_a_File">Loading Data From a File</a></h5>
 
@@ -478,6 +504,19 @@ The probably rare but still bad races of issue #9 have been solved at long last,
 <pre> make test9</pre><p>
 Check the test results by opening test/index.html with a browser. </p>
 
+<h4><a name="Util_Tests">Util Tests</a></h4><p>
+For this test you need database like this:</p>
+
+<pre> $ mysql [-u&lt;user&gt; -p]
+ create database test_database;
+ grant all privileges on test_database.* to test_username@localhost identified by 'test_password';
+ flush privileges;</pre>
+
+<p>The test suite is test/as_record_SUITE.erl. To run the test, use make:</p>
+
+<pre> make testutil</pre>
+
+<p>Check the test results by opening test/index.html with a browser.</p>
 
 <h3><a name="History">History</a></h3>
 
@@ -527,24 +566,24 @@ Check the test results by opening test/index.html with a browser. </p>
 <li class="ref url"> Commits in the current Eonblast Emysql branch:<a name="24" id="24" href="https://github.com/Eonblast/Emysql/commits/master" target="_parent">https://github.com/Eonblast/Emysql/commits/master</a></li></p>
 
     <p><br>
-<li class="ref email"> Magnus Ahltorp:<a name="ma" id="ma" href="mailto:ahltorp@nada.kth.se">ahltorp@nada.kth.se</a></li>
-<li class="ref email"> Fredrik Thulin:<a name="fr" id="fr" href="mailto:ft@it.su.se">ft@it.su.se</a></li>
-<li class="ref email"> Mickael Remond:<a name="mr" id="mr" href="mailto:mickael.remond@process-one.net">mickael.remond@process-one.net</a></li>
+<li class="ref email"> Magnus Ahltorp:<a name="ma" id="ma" href="mailto:mailto:ahltorp@nada.kth.se">mailto:ahltorp@nada.kth.se</a></li>
+<li class="ref email"> Fredrik Thulin:<a name="fr" id="fr" href="mailto:mailto:ft@it.su.se">mailto:ft@it.su.se</a></li>
+<li class="ref email"> Mickael Remond:<a name="mr" id="mr" href="mailto:mailto:mickael.remond@process-one.net">mailto:mickael.remond@process-one.net</a></li>
 <li class="ref url"> Yariv Sadan:<a name="ys" id="ys" href="http://yarivsblog.blogspot.com" target="_parent">http://yarivsblog.blogspot.com</a></li>
-<li class="ref email"> Dave Smith:<a name="ds" id="ds" href="mailto:dizzyd@dizzyd.com">dizzyd@dizzyd.com</a></li>
+<li class="ref email"> Dave Smith:<a name="ds" id="ds" href="mailto:mailto:dizzyd@dizzyd.com">mailto:dizzyd@dizzyd.com</a></li>
 <li class="ref url"> Nick Gerakines:<a name="ng" id="ng" href="https://github.com/ngerakines" target="_parent">https://github.com/ngerakines</a></li>
 <li class="ref url"> Jacob Vorreuter:<a name="jv" id="jv" href="https://github.com/JacobVorreuter" target="_parent">https://github.com/JacobVorreuter</a></li>
-<li class="ref email"> Bill Warnecke:<a name="bw" id="bw" href="mailto:bill@rupture.com">bill@rupture.com</a></li>
-<li class="ref email"> Henning Diedrich:<a name="hd" id="hd" href="mailto:hd2010@eonblast.com">hd2010@eonblast.com</a></li>
+<li class="ref email"> Bill Warnecke:<a name="bw" id="bw" href="mailto:mailto:bill@rupture.com">mailto:bill@rupture.com</a></li>
+<li class="ref email"> Henning Diedrich:<a name="hd" id="hd" href="mailto:mailto:hd2010@eonblast.com">mailto:hd2010@eonblast.com</a></li>
 <li class="ref url"> Vitaliy Batichko:<a name="vb" id="vb" href="https://github.com/bva" target="_parent">https://github.com/bva</a></li>
 <li class="ref url"> Chris Rempel:<a name="cr" id="cr" href="https://github.com/csrl" target="_parent">https://github.com/csrl</a></li>
-<li class="ref email"> Patrick Atambo:<a name="pa" id="pa" href="mailto:partoa@gmail.com">partoa@gmail.com</a></li>
-<li class="ref email"> Joel Meyer:<a name="jm" id="jm" href="mailto:joel.meyer@openx.org">joel.meyer@openx.org</a></li>
+<li class="ref email"> Patrick Atambo:<a name="pa" id="pa" href="mailto:mailto:partoa@gmail.com">mailto:partoa@gmail.com</a></li>
+<li class="ref email"> Joel Meyer:<a name="jm" id="jm" href="mailto:mailto:joel.meyer@openx.org">mailto:joel.meyer@openx.org</a></li>
 <li class="ref url"> Erik Seres:<a name="es" id="es" href="https://github.com/eseres" target="_parent">https://github.com/eseres</a></li>
 <li class="ref url"> Alexey Lebedeff:<a name="al" id="al" href="https://github.com/binarin" target="_parent">https://github.com/binarin</a></li>
 <li class="ref url"> Logan Owen:<a name="lo" id="lo" href="https://github.com/lsowen" target="_parent">https://github.com/lsowen</a></li>
 <li class="ref url"> Seven Du:<a name="sd" id="sd" href="https://github.com/seven1240" target="_parent">https://github.com/seven1240</a></li>
-<li class="ref email"> Brendon Hogger:<a name="bh" id="bh" href="mailto:brendonh@gmail.com">brendonh@gmail.com</a></li>
+<li class="ref email"> Brendon Hogger:<a name="bh" id="bh" href="mailto:mailto:brendonh@gmail.com">mailto:brendonh@gmail.com</a></li>
 <li class="ref url"> Bart van Deenen:<a name="bd" id="bd" href="https://github.com/bvdeenen" target="_parent">https://github.com/bvdeenen</a></li>
 <li class="ref url"> Ransom Richardson:<a name="rr" id="rr" href="https://github.com/ransomr" target="_parent">https://github.com/ransomr</a></li>
 <li class="ref url"> Qing Liang:<a name="ql" id="ql" href="https://github.com/qingliangcn" target="_parent">https://github.com/qingliangcn</a></li></p>
@@ -624,6 +663,6 @@ function url(tag) { var o=document.getElementById(tag); return o ? o.href : '#'+
 
 <hr>
 <div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
-<p><i>Generated by EDoc, Jun 21 2013, 11:14:51.</i></p>
+<p><i>Generated by EDoc, Feb 24 2014, 16:02:42.</i></p>
 </body>
 </html>

@@ -104,6 +104,8 @@
             modules/0
         ]).
 
+-type state() :: any().
+
 % for record and constant defines
 -include("emysql.hrl").
 
@@ -187,18 +189,6 @@ modules() ->
 default_timeout() ->
     emysql_app:default_timeout().
 
-%% @spec add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds) -> Result
-%%      PoolId = atom()
-%%      Size = integer()
-%%      User = string()
-%%      Password = string()
-%%      Host = string()
-%%      Port = integer()
-%%      Database = string()
-%%      Encoding = utf8 | latin1
-%%      StartCmds = list(binary())
-%%      Result = {reply, {error, pool_already_exists}, state()} | {reply, ok, state() }
-%%
 %% @doc Synchronous call to the connection manager to add a pool.
 %%
 %% === Implementation ===
@@ -207,10 +197,21 @@ default_timeout() ->
 %% emysql_conn_mgr:add_pool() to make the pool known to the pool management.
 %% emysql_conn_mgr:add_pool() is translated into a blocking gen-server call.
 %% @end doc: hd feb 11
-
 add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding) ->
     add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, []).
 
+-spec add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds) -> Result
+    when
+      PoolId :: atom(),
+      Size :: integer(),
+      User :: string(),
+      Password :: string(),
+      Host :: string(),
+      Port :: integer(),
+      Database :: string(),
+      Encoding :: utf8 | latin1,
+      StartCmds :: list(binary()),
+      Result :: {reply, {error, pool_already_exists}, state()} | {reply, ok, state() }.
 add_pool(PoolId, Size, User, Passwd, Host, Port, DB, Encoding, StartCmds)
   when is_atom(PoolId),
        is_integer(Size),

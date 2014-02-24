@@ -209,11 +209,15 @@ asciz_binary(<<0:8, Rest/binary>>, Acc) ->
 asciz_binary(<<C:8, Rest/binary>>, Acc) ->
     asciz_binary(Rest, [C | Acc]).
 
-%% @spec insert_id(ok_packet()) -> integer() | binary().
+%% @doc insert_id/1 extracts the Insert ID from an OK Packet
+%% @end
+-spec insert_id(#ok_packet{}) -> integer() | binary().
 insert_id(#ok_packet{insert_id=ID}) ->
     ID.
 
-%% @spec affected_rows(ok_packet()) -> integer().
+%% @doc affected_rows/1 extracts the number of affected rows from an OK Packet
+%% @end
+-spec affected_rows(#ok_packet{}) -> integer().
 affected_rows(#ok_packet{affected_rows=Rows}) ->
     Rows.
 

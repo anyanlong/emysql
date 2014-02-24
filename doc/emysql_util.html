@@ -14,7 +14,11 @@
 
 
 <h2><a name="index">Function Index</a></h2>
-<table width="100%" class=index border="0" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#as_record-3">as_record/3</a></td><td></td></tr>
+<table width="100%" class=index border="0" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#affected_rows-1">affected_rows/1</a></td><td>affected_rows/1 extracts the number of affected rows from an OK Packet.</td></tr>
+<tr><td valign="top"><a href="#as_dict-1">as_dict/1</a></td><td>package row data as a dict.</td></tr>
+<tr><td valign="top"><a href="#as_json-1">as_json/1</a></td><td>package row data as erlang json (jsx/jiffy compatible).</td></tr>
+<tr><td valign="top"><a href="#as_proplist-1">as_proplist/1</a></td><td>package row data as a proplist.</td></tr>
+<tr><td valign="top"><a href="#as_record-3">as_record/3</a></td><td></td></tr>
 <tr><td valign="top"><a href="#as_record-4">as_record/4</a></td><td>package row data as records.</td></tr>
 <tr><td valign="top"><a href="#asciz-1">asciz/1</a></td><td></td></tr>
 <tr><td valign="top"><a href="#bxor_binary-2">bxor_binary/2</a></td><td></td></tr>
@@ -23,16 +27,54 @@
 <tr><td valign="top"><a href="#encode-2">encode/2</a></td><td>Encode a value so that it can be included safely in a MySQL query.</td></tr>
 <tr><td valign="top"><a href="#field_names-1">field_names/1</a></td><td></td></tr>
 <tr><td valign="top"><a href="#hash-1">hash/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#insert_id-1">insert_id/1</a></td><td>insert_id/1 extracts the Insert ID from an OK Packet.</td></tr>
 <tr><td valign="top"><a href="#length_coded_binary-1">length_coded_binary/1</a></td><td></td></tr>
 <tr><td valign="top"><a href="#length_coded_string-1">length_coded_string/1</a></td><td></td></tr>
 <tr><td valign="top"><a href="#null_terminated_string-2">null_terminated_string/2</a></td><td></td></tr>
 <tr><td valign="top"><a href="#quote-1">quote/1</a></td><td>Quote a string or binary value so that it can be included safely in a
   MySQL query.</td></tr>
+<tr><td valign="top"><a href="#result_type-1">result_type/1</a></td><td></td></tr>
 <tr><td valign="top"><a href="#rnd-3">rnd/3</a></td><td></td></tr>
+<tr><td valign="top"><a href="#test_p-0">test_p/0</a></td><td></td></tr>
+<tr><td valign="top"><a href="#test_u-0">test_u/0</a></td><td>Username for testing.</td></tr>
 <tr><td valign="top"><a href="#to_binary-1">to_binary/1</a></td><td></td></tr>
 </table>
 
 <h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="affected_rows-1">affected_rows/1</a></h3>
+<div class="spec">
+<p><tt>affected_rows(Ok_packet::#ok_packet{}) -&gt; integer()</tt><br></p>
+</div><p>affected_rows/1 extracts the number of affected rows from an OK Packet</p>
+
+<h3 class="function"><a name="as_dict-1">as_dict/1</a></h3>
+<div class="spec">
+<p><tt>as_dict(Res::Result) -&gt; dict</tt>
+<ul class="definitions"><li><tt>Result = #result_packet{}</tt></li></ul></p>
+</div><p><p>package row data as a dict</p>
+ 
+  <p>-module(fetch_example).</p>
+ 
+  fetch_foo() -&gt;
+   Res = emysql:execute(pool1, "select * from foo"),
+   Res:as_dict(Res).</p>
+
+<h3 class="function"><a name="as_json-1">as_json/1</a></h3>
+<div class="spec">
+<p><tt>as_json(Result_packet::Result) -&gt; Result</tt><br></p>
+</div><p>package row data as erlang json (jsx/jiffy compatible)</p>
+
+<h3 class="function"><a name="as_proplist-1">as_proplist/1</a></h3>
+<div class="spec">
+<p><tt>as_proplist(Result_packet::Result) -&gt; proplist</tt>
+<ul class="definitions"><li><tt>Result = #result_packet{}</tt></li></ul></p>
+</div><p><p>package row data as a proplist</p>
+ 
+  <p>-module(fetch_example).</p>
+ 
+  fetch_foo() -&gt;
+   Res = emysql:execute(pool1, "select * from foo"),
+   Res:as_proplist(Res).</p>
 
 <h3 class="function"><a name="as_record-3">as_record/3</a></h3>
 <div class="spec">
@@ -81,13 +123,18 @@ Fields are the field names to generate for each record.</p>
 
 <h3 class="function"><a name="field_names-1">field_names/1</a></h3>
 <div class="spec">
-<p><tt>field_names(Result) -&gt; any()</tt></p>
+<p><tt>field_names(Result_packet) -&gt; any()</tt></p>
 </div>
 
 <h3 class="function"><a name="hash-1">hash/1</a></h3>
 <div class="spec">
 <p><tt>hash(S) -&gt; any()</tt></p>
 </div>
+
+<h3 class="function"><a name="insert_id-1">insert_id/1</a></h3>
+<div class="spec">
+<p><tt>insert_id(Ok_packet::#ok_packet{}) -&gt; integer() | binary()</tt><br></p>
+</div><p>insert_id/1 extracts the Insert ID from an OK Packet</p>
 
 <h3 class="function"><a name="length_coded_binary-1">length_coded_binary/1</a></h3>
 <div class="spec">
@@ -112,10 +159,25 @@ Fields are the field names to generate for each record.</p>
   MySQL query. For the quoting, a binary is converted to a list and back.
   For this, it's necessary to know the encoding of the binary.</p>
 
+<h3 class="function"><a name="result_type-1">result_type/1</a></h3>
+<div class="spec">
+<p><tt>result_type(Ok_packet) -&gt; any()</tt></p>
+</div>
+
 <h3 class="function"><a name="rnd-3">rnd/3</a></h3>
 <div class="spec">
 <p><tt>rnd(N, Seed1, Seed2) -&gt; any()</tt></p>
 </div>
+
+<h3 class="function"><a name="test_p-0">test_p/0</a></h3>
+<div class="spec">
+<p><tt>test_p() -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="test_u-0">test_u/0</a></h3>
+<div class="spec">
+<p><tt>test_u() -&gt; any()</tt></p>
+</div><p>Username for testing. "hello_username" by default, "travis" if in travis</p>
 
 <h3 class="function"><a name="to_binary-1">to_binary/1</a></h3>
 <div class="spec">
@@ -124,6 +186,6 @@ Fields are the field names to generate for each record.</p>
 <hr>
 
 <div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
-<p><i>Generated by EDoc, Jun 21 2013, 11:14:51.</i></p>
+<p><i>Generated by EDoc, Feb 24 2014, 16:02:42.</i></p>
 </body>
 </html>

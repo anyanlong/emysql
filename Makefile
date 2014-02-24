@@ -24,7 +24,7 @@ docs:
 	sed -E -f doc/markedoc.sed README.md > doc/readme.edoc
 	sed -E -f doc/markedoc.sed CHANGES.md > doc/changes.edoc
 	erl -noshell -run edoc_run application "'emysql'" '"."' '[{def,{vsn,""}},{stylesheet, "emysql-style.css"}]'
-	sed -E -i "" -e "s/<table width=\"100%\" border=\"1\"/<table width=\"100%\" class=index border=\"0\"/" doc/*.html
+	LANG=C && LC_CTYPE=C && sed -E -i "" -e "s/<table width=\"100%\" border=\"1\"/<table width=\"100%\" class=index border=\"0\"/" doc/*.html
 
 # Pushes created docs into dir ../Emysql-github-pages to push to github pages.
 # Make sure to do 'make docs' first.
