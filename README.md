@@ -1,3 +1,30 @@
+# Emysql
+
+Emysql implements a stable driver toward the MySQL database. It currently support fairly recent versions (somewhere around 5.3+) and it is considered fairly stable in production.
+
+The driver has several technical shortcomings:
+
+* No clear protocol / connection pool separation
+* A very complicated connection pool management
+* Uses the textual protocol in a lot of places where it should use a more binary protocol
+
+# Versioning
+
+Semantic versioning is used. Versions are given as `x.y.z`:
+
+* `x` changes break backward compatibility
+* `y` changes add new functionality—but does not break compatibility backwards
+* `z` changes recognizes a new version, but is not supposed to break anything
+
+# Changelog of recent changes
+
+## Emysql 0.3.2
+
+* We should be on Travis CI now with full tests running
+* Pulled in lots of smaller changes which should be rather cosmetic fixes.
+* R16 warnings eliminated (Jesse Gumm)
+* Tried to consolidate simple parts of the driver
+
 ## Emysql 0.3.0
 
 [![Build Status](https://travis-ci.org/Eonblast/Emysql.png?branch=master)](https://travis-ci.org/Eonblast/Emysql)
