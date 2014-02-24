@@ -20,3 +20,4 @@ test/variables-ct*
 test/ct_default.css
 logs/*
 .#*
+include/crypto_compat.hrl

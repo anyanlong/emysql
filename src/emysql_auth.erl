@@ -28,6 +28,7 @@
 -compile(export_all).
 
 -include("emysql.hrl").
+-include("crypto_compat.hrl").
 
 do_handshake(Sock, User, Password) ->
     %-% io:format("~p handshake: recv_greeting~n", [self()]),
@@ -54,10 +55,10 @@ recv_greeting(Sock) ->
     case GreetingPacket#packet.data of
         <<255, _/binary>> ->
             % io:format("error: ", []),
-            {{#error_packet{
+            {#error_packet{
                 code = Code,
                 msg = Msg
-            },_}, _Rest} = emysql_tcp:response(Sock, emysql_app:default_timeout(), GreetingPacket, Unparsed),
+            },_, _Rest} = emysql_tcp:response(Sock, emysql_app:default_timeout(), GreetingPacket, Unparsed),
             % io:format("exit: ~p~n-------------~p~n", [Code, Msg]),
             exit({Code, Msg});
         <<ProtocolVersion:8/integer, Rest1/binary>> ->
@@ -136,11 +137,11 @@ auth(Sock, SeqNum, User, Password, Salt1, Salt2, Plugin) ->
 password_new([], _Salt) ->
     <<>>;
 password_new(Password, Salt) ->
-    Stage1 = crypto:sha(Password),
-    Stage2 = crypto:sha(Stage1),
-    Res = crypto:sha_final(
-        crypto:sha_update(
-            crypto:sha_update(crypto:sha_init(), Salt),
+    Stage1 = ?HASH_SHA(Password),
+    Stage2 = ?HASH_SHA(Stage1),
+    Res = ?HASH_FINAL(
+        ?HASH_UPDATE(
+            ?HASH_UPDATE(?HASH_INIT(), Salt),
             Stage2
         )
     ),
