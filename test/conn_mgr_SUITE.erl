@@ -44,7 +44,7 @@ init_per_suite(Config) ->
     crypto:start(),
     application:start(emysql),
     emysql:add_pool(test_pool, 1,
-        emysql_util:test_u(), emysql_util:test_p(), "localhost", 3306,
+        test_helper:test_u(), test_helper:test_p(), "localhost", 3306,
         "hello_database", utf8),
     Config.
     
