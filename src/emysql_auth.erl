@@ -25,64 +25,45 @@
 %% OTHER DEALINGS IN THE SOFTWARE.
 -module(emysql_auth).
 -export([do_handshake/3]).
--compile(export_all).
 
 -include("emysql.hrl").
 -include("crypto_compat.hrl").
 
 do_handshake(Sock, User, Password) ->
-    %-% io:format("~p handshake: recv_greeting~n", [self()]),
-    Greeting = recv_greeting(Sock),
-    %-% io:format("~p handshake: auth~n", [self()]),
-    case auth(Sock, Greeting#greeting.seq_num+1, User, Password,
-        Greeting#greeting.salt1, Greeting#greeting.salt2, Greeting#greeting.plugin) of
+    #greeting { seq_num = SeqNum} = Greeting = recv_greeting(Sock),
+    case auth(Sock, User, Password, Greeting#greeting{ seq_num = SeqNum + 1}) of
         OK when is_record(OK, ok_packet) ->
-            %-% io:format("~p handshake: ok~n", [self()]),
             ok;
-        Err when is_record(Err, error_packet) ->
-            %-% io:format("~p handshake: FAIL ~p -> EXIT ~n~n", [self(), Err]),
+        #error_packet{} = Err ->
             exit({failed_to_authenticate, Err});
         Other ->
-            %-% io:format("~p handshake: UNEXPECTED ~p -> EXIT ~n~n", [self(), Other]),
             exit({unexpected_packet, Other})
     end,
     Greeting.
 
 recv_greeting(Sock) ->
-    %-% io:format("~p recv_greeting~n", [self()]),
     {GreetingPacket,Unparsed} = emysql_tcp:recv_packet(Sock, emysql_app:default_timeout(), <<>>),
-    %-% io:format("~p recv_greeting ... received ...~n", [self()]),
     case GreetingPacket#packet.data of
         <<255, _/binary>> ->
-            % io:format("error: ", []),
             {#error_packet{
                 code = Code,
                 msg = Msg
             },_, _Rest} = emysql_tcp:response(Sock, emysql_app:default_timeout(), GreetingPacket, Unparsed),
-            % io:format("exit: ~p~n-------------~p~n", [Code, Msg]),
             exit({Code, Msg});
         <<ProtocolVersion:8/integer, Rest1/binary>> ->
-            % io:format("prl v: ~p~n-------------~p~n", [ProtocolVersion, Rest1]),
-            {ServerVersion, Rest2} = emysql_util:asciz(Rest1),
-            % io:format("srv v: ~p~n-------------~p~n", [ServerVersion, Rest2]),
+            {ServerVersion, Rest2} = asciiz(Rest1),
             <<ThreadID:32/little, Rest3/binary>> = Rest2,
-            % io:format("tread id: ~p~n-------------~p~n", [ThreadID, Rest3]),
-            {Salt, Rest4} = emysql_util:asciz(Rest3),
-            % io:format("salt: ~p~n-------------~p~n", [Salt, Rest4]),
+            {Salt, Rest4} = asciiz(Rest3),
             <<ServerCaps:16/little, Rest5/binary>> = Rest4,
-            % io:format("caps: ~p~n-------------~p~n", [ServerCaps, Rest5]),
             <<ServerLanguage:8/little,
                 ServerStatus:16/little,
                 ServerCapsHigh:16/little,
                 ScrambleLength:8/little,
                 _:10/binary-unit:8,
                 Rest6/binary>> = Rest5,
-            % io:format("lang: ~p, status: ~p, caps hi: ~p, salt len: ~p~n-------------~p ~n", [ServerLanguage, ServerStatus, ServerCapsHigh, ScrambleLength, Rest6]),
             Salt2Length = case ScrambleLength of 0 -> 13; _-> ScrambleLength - 8 end,
             <<Salt2Bin:Salt2Length/binary-unit:8, Plugin/binary>> = Rest6,
-            {Salt2, <<>>} = emysql_util:asciz(Salt2Bin),
-            % io:format("salt 2: ~p~n", [Salt2]),
-            % io:format("plugin: ~p~n", [Plugin]),
+            {Salt2, <<>>} = asciiz(Salt2Bin),
             #greeting{
                 protocol_version = ProtocolVersion,
                 server_version = ServerVersion,
@@ -97,31 +78,35 @@ recv_greeting(Sock) ->
                 plugin = Plugin
             };
         What ->
-            %-% io:format("~p recv_greeting FAILED: ~p~n", [self(), What]),
             exit({greeting_failed, What})
     end.
 
-parse_server_version(Version) ->
-    [A,B,C] = string:tokens(Version, "."),
-    {list_to_integer(A), list_to_integer(B), list_to_integer(C)}.
+%% password_type/2 discriminates the kind of password we want
+password_type(Password, ?MYSQL_OLD_PASSWORD) when is_list(Password); is_binary(Password) -> old;
+password_type(Password, _) when is_list(Password); is_binary(Password) -> new;
+password_type(_, _) -> empty.
 
-auth(Sock, SeqNum, User, Password, Salt1, Salt2, Plugin) ->
-    ScrambleBuff = if
-        is_list(Password) orelse is_binary(Password) ->
-            case Plugin of
-                ?MYSQL_OLD_PASSWORD ->
-                    password_old(Password, Salt1 ++ Salt2); % untested
-                _ ->
-                    password_new(Password, Salt1 ++ Salt2)
-            end;
-        true ->
-            <<>>
+%% capabilities/0 formats a list of capabilities for the wire
+capabilities(Cs) ->
+    lists:foldl(fun erlang:'bor'/2, 0, Cs).
+
+auth(Sock, User, Password,
+     #greeting { seq_num = SeqNum,
+                 salt1 = Salt1,
+                 salt2 = Salt2,
+                 plugin = Plugin }) ->
+    ScrambleBuff = case password_type(Password, Plugin) of
+    	old -> password_old(Password, <<Salt1/binary, Salt2/binary>>);
+    	new -> password_new(Password, <<Salt1/binary, Salt2/binary>>);
+    	empty -> <<>>
     end,
-    DBCaps = 0,
+
     DatabaseB = <<>>,
-    Caps = ?LONG_PASSWORD  bor ?CLIENT_LOCAL_FILE bor ?LONG_FLAG bor ?TRANSACTIONS bor
-        ?CLIENT_MULTI_STATEMENTS bor ?CLIENT_MULTI_RESULTS bor
-        ?PROTOCOL_41 bor ?SECURE_CONNECTION bor DBCaps,
+    Caps = capabilities([
+    	?LONG_PASSWORD , ?CLIENT_LOCAL_FILE, ?LONG_FLAG, ?TRANSACTIONS,
+	?CLIENT_MULTI_STATEMENTS, ?CLIENT_MULTI_RESULTS,
+	?PROTOCOL_41, ?SECURE_CONNECTION
+    ]),
     Maxsize = ?MAXPACKETBYTES,
     UserB = unicode:characters_to_binary(User),
     PasswordL = size(ScrambleBuff),
@@ -134,8 +119,7 @@ auth(Sock, SeqNum, User, Password, Salt1, Salt2, Plugin) ->
             Result
     end.
 
-password_new([], _Salt) ->
-    <<>>;
+password_new([], _Salt) -> <<>>;
 password_new(Password, Salt) ->
     Stage1 = ?HASH_SHA(Password),
     Stage2 = ?HASH_SHA(Stage1),
@@ -145,14 +129,43 @@ password_new(Password, Salt) ->
             Stage2
         )
     ),
-    emysql_util:bxor_binary(Res, Stage1).
+    bxor_binary(Res, Stage1).
 
 password_old(Password, Salt) ->
-    {P1, P2} = emysql_util:hash(Password),
-    {S1, S2} = emysql_util:hash(Salt),
+    {P1, P2} = hash(Password),
+    {S1, S2} = hash(Salt),
     Seed1 = P1 bxor S1,
     Seed2 = P2 bxor S2,
-    List = emysql_util:rnd(9, Seed1, Seed2),
+    List = rnd(9, Seed1, Seed2),
     {L, [Extra]} = lists:split(8, List),
     list_to_binary(lists:map(fun (E) -> E bxor (Extra - 64) end, L)).
-    % note, this operates on byte integer lists, never strings, much less unicode
+
+bxor_binary(B1, B2) ->
+    list_to_binary([E1 bxor E2 || {E1, E2} <- lists:zip(binary_to_list(B1), binary_to_list(B2))]).
+
+rnd(N, Seed1, Seed2) ->
+    Mod = (1 bsl 30) - 1,
+    rnd(N, [], Seed1 rem Mod, Seed2 rem Mod).
+rnd(0, List, _, _) ->
+    lists:reverse(List);
+rnd(N, List, Seed1, Seed2) ->
+    Mod = (1 bsl 30) - 1,
+    NSeed1 = (Seed1 * 3 + Seed2) rem Mod,
+    NSeed2 = (NSeed1 + Seed2 + 33) rem Mod,
+    Float = (float(NSeed1) / float(Mod))*31,
+    Val = trunc(Float)+64,
+    rnd(N - 1, [Val | List], NSeed1, NSeed2).
+
+hash(S) -> hash(S, 1345345333, 305419889, 7).
+hash([C | S], N1, N2, Add) ->
+    N1_1 = N1 bxor (((N1 band 63) + Add) * C + N1 * 256),
+    N2_1 = N2 + ((N2 * 256) bxor N1_1),
+    Add_1 = Add + C,
+    hash(S, N1_1, N2_1, Add_1);
+hash([], N1, N2, _Add) ->
+    Mask = (1 bsl 31) - 1,
+    {N1 band Mask , N2 band Mask}.
+
+asciiz(Data) when is_binary(Data) ->
+    [S, R] = binary:split(Data, <<0>>),
+    {S, R}.

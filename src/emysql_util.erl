@@ -25,27 +25,31 @@
 %% FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 %% OTHER DEALINGS IN THE SOFTWARE.
 -module(emysql_util).
+
+%% Query data
 -export([
          affected_rows/1,
-         asciz/1,
+          result_type/1
+]).
+        
+%% Conversion routines
+-export([
          as_dict/1,
          as_json/1,
          as_proplist/1,
          as_record/3,
-         as_record/4,
-         bxor_binary/2,
-         dualmap/3,
+         as_record/4
+]).
+		
+-export([
          encode/1,
          encode/2,
          field_names/1,
-         hash/1,
          insert_id/1,
          length_coded_binary/1,
          length_coded_string/1,
          null_terminated_string/2,
          quote/1,
-         result_type/1,
-         rnd/3,
          to_binary/1
         ]).
 
@@ -190,18 +194,6 @@ null_terminated_string(<<_:8>>, _) ->
 null_terminated_string(<<H:1/binary, Tail/binary>>, Acc) ->
     null_terminated_string(Tail, <<Acc/binary, H/binary>>).
 
-asciz(Data) when is_binary(Data) ->
-    asciz_binary(Data, []);
-asciz(Data) when is_list(Data) ->
-    {String, [0 | Rest]} = lists:splitwith(fun (C) -> C /= 0 end, Data),
-    {String, Rest}.
-
-asciz_binary(<<>>, Acc) ->
-    {lists:reverse(Acc), <<>>};
-asciz_binary(<<0:8, Rest/binary>>, Acc) ->
-    {lists:reverse(Acc), Rest};
-asciz_binary(<<C:8, Rest/binary>>, Acc) ->
-    asciz_binary(Rest, [C | Acc]).
 
 %% @doc insert_id/1 extracts the Insert ID from an OK Packet
 %% @end
@@ -215,37 +207,6 @@ insert_id(#ok_packet{insert_id=ID}) ->
 affected_rows(#ok_packet{affected_rows=Rows}) ->
     Rows.
 
-bxor_binary(B1, B2) ->
-    list_to_binary(dualmap(fun (E1, E2) -> E1 bxor E2 end, binary_to_list(B1), binary_to_list(B2))).
-    % note: only call from auth, password hashing, using int list returned from sha.
-
-dualmap(_F, [], []) ->
-    [];
-dualmap(F, [E1 | R1], [E2 | R2]) ->
-    [F(E1, E2) | dualmap(F, R1, R2)].
-
-hash(S) -> hash(S, 1345345333, 305419889, 7).
-hash([C | S], N1, N2, Add) ->
-    N1_1 = N1 bxor (((N1 band 63) + Add) * C + N1 * 256),
-    N2_1 = N2 + ((N2 * 256) bxor N1_1),
-    Add_1 = Add + C,
-    hash(S, N1_1, N2_1, Add_1);
-hash([], N1, N2, _Add) ->
-    Mask = (1 bsl 31) - 1,
-    {N1 band Mask , N2 band Mask}.
-
-rnd(N, Seed1, Seed2) ->
-    Mod = (1 bsl 30) - 1,
-    rnd(N, [], Seed1 rem Mod, Seed2 rem Mod).
-rnd(0, List, _, _) ->
-    lists:reverse(List);
-rnd(N, List, Seed1, Seed2) ->
-    Mod = (1 bsl 30) - 1,
-    NSeed1 = (Seed1 * 3 + Seed2) rem Mod,
-    NSeed2 = (NSeed1 + Seed2 + 33) rem Mod,
-    Float = (float(NSeed1) / float(Mod))*31,
-    Val = trunc(Float)+64,
-    rnd(N - 1, [Val | List], NSeed1, NSeed2).
 
 %% @doc Encode a value so that it can be included safely in a MySQL query.
 %% @spec encode(term()) -> binary() | {error, Error}
