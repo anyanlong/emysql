@@ -12,7 +12,4 @@ CREATE DATABASE test2;
 CREATE TABLE test1.test (a INT(11) NOT NULL);
 CREATE TABLE test2.test (b int(11) NOT NULL);
 
-DROP DATABASE IF EXISTS test_database;
-CREATE DATABASE test_database;
-GRANT ALL PRIVILEGES ON test_database.* to test_username@localhost IDENTIFIED BY 'test_password';
 EOF
