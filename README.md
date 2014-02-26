@@ -20,6 +20,13 @@ Semantic versioning is used. Versions are given as `x.y.z`:
 
 # Changelog of recent changes
 
+## Emysql 0.4.0
+
+Introduced changes by Garrett Smith:
+
+* Support connection timeouts in gen_tcp:connect/3. This allows the driver to better handle connection timeouts upon initial connections.
+* Introduce `emysql:add_pool/2` as a proplist-based way of initializing a pool. This is going to be the preferred way of initializing pools in the future.
+
 ## Emysql 0.3.2
 
 * We should be on Travis CI now with full tests running
