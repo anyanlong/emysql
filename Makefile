@@ -1,8 +1,7 @@
 LIBDIR=$(shell erl -eval 'io:format("~s~n", [code:lib_dir()])' -s init stop -noshell)
-VERSION=0.3.0
+VERSION=0.4.0
 PKGNAME=emysql
 APP_NAME=emysql
-CRYPTO_PATH=/opt/local/var/macports/software/erlang/R14A_0/opt/local/lib/erlang/lib/crypto-2.0/ebin/
 
 MODULES=$(shell ls -1 src/*.erl | awk -F[/.] '{ print $$2 }' | sed '$$q;s/$$/,/g')
 MAKETIME=$(shell date)
@@ -59,6 +58,7 @@ clean:
 	rm -f *.beam
 	rm -f *.html
 	rm -f include/crypto_compat.hrl
+	rm -fr logs
 
 package: clean
 	@mkdir $(PKGNAME)-$(VERSION)/ && cp -rf ebin include Makefile README src support t $(PKGNAME)-$(VERSION)
@@ -68,22 +68,26 @@ package: clean
 install:
 	@for i in ebin/*.beam ebin/*.app include/*.hrl src/*.erl; do install -m 644 -D $$i $(prefix)/$(LIBDIR)/$(PKGNAME)-$(VERSION)/$$i ; done
 
-all-test: test encoding-test test20 testutil
+all-test: test testutil
 
-encoding-test: all
-	(cd test; ct_run -suite latin_SUITE utf8_SUITE utf8_to_latindb_SUITE latin_to_utf8db_SUITE -pa ../ebin $(CRYPTO_PATH))
+CT_OPTS ?=
+CT_RUN = ct_run \
+        -no_auto_compile \
+        -noshell \
+        -pa $(realpath ebin) \
+        -dir test \
+        -logdir logs \
+        -cover test/cover.spec -cover_stop false \
+        $(CT_OPTS)
+# Currently, the order of the test cases matter!
+CT_SUITES=environment basics conn_mgr  emysql_util
 
-test: all
-	(cd test; ct_run -suite environment_SUITE basics_SUITE conn_mgr_SUITE -pa ../ebin $(CRYPTO_PATH))
+build-tests:
+	erlc -v -o test/ $(wildcard test/*.erl) -pa ebin/
 
-test20: all
-	(cd test; ct_run -suite pool_SUITE -pa ../ebin $(CRYPTO_PATH))
-
-test9: all
-	(cd test; ct_run -suite con_mgr_SUITE -pa ../ebin $(CRYPTO_PATH))
-
-testutil: all
-	(cd test; ct_run -suite as_record_SUITE -cover as_record.cover -pa ../ebin $(CRYPTO_PATH))
+test: all build-tests
+	@mkdir -p logs
+	$(CT_RUN) -suite $(addsuffix _SUITE,$(CT_SUITES)) ; \
 
 prove: all
 	(cd t;$(MAKE))

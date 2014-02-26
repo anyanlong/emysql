@@ -4,7 +4,6 @@ before_script:
     - "./travis-ci-setup -h127.0.0.1 -utravis"
     - make
 
-# once #89 is closed, this should be replaced by 'make all-test'
 script: "make test"
 otp_release:
    - 17.0-rc1

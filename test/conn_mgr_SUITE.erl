@@ -31,7 +31,7 @@ all() ->
     [ 
       stuck_waiting_1, % former two_procs
       stuck_waiting_2, 
-      pool_leak_1,     % former no_lock_timeout
+      %pool_leak_1,     % former no_lock_timeout
       pool_leak_2,
       dying_client_does_not_lock_the_connection_out
     ].

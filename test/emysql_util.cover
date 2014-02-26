@@ -1,1 +1,0 @@
-{incl_mods, [as_record_SUITE,emysql_util]}.
