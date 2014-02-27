@@ -50,7 +50,7 @@ handshake(Sock, User, Password) ->
             check_handshake_auth(Auth, Greeting);
         {error, wrong_parse} -> 
             {#error_packet{ code = Code, msg = Msg},_, _Rest} =
-                emysql_tcp:response(Sock, emysql_app:default_timeout(), Packet, Unparsed),
+                emysql_tcp:parse_response(Sock, emysql_app:default_timeout(), Packet, Unparsed),
             {error, {Code, Msg}};
         {greeting_failed, What} ->
             {error, {greeting_failed, What}}

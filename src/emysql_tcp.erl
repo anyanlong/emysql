@@ -26,20 +26,16 @@
 %% OTHER DEALINGS IN THE SOFTWARE.
 %% @private
 -module(emysql_tcp).
--export([send_and_recv_packet/3, recv_packet/3, response/4]).
+-export([send_and_recv_packet/3, recv_packet/3, parse_response/4]).
 
 -include("emysql.hrl").
 -include("emysql_internal.hrl").
 
--define(PACKETSIZE, 1460).
+-type packet_result() :: #eof_packet{} | #ok_packet{} | #result_packet{} | #error_packet{}.
 
+-spec send_and_recv_packet(port(), iodata(), integer()) -> packet_result() | [packet_result()].
 send_and_recv_packet(Sock, Packet, SeqNum) ->
-    case gen_tcp:send(Sock, <<(size(Packet)):24/little, SeqNum:8, Packet/binary>>) of
-        ok ->
-            ok;
-        {error, Reason} ->
-            exit({failed_to_send_packet_to_server, Reason})
-    end,
+    ok = gen_tcp:send(Sock, [<<(size(Packet)):24/little, SeqNum:8>>, Packet]),
     DefaultTimeout = emysql_app:default_timeout(),
     case response_list(Sock, DefaultTimeout, ?SERVER_MORE_RESULTS_EXIST) of
         % This is a bit murky. It's compatible with former Emysql versions
@@ -56,7 +52,7 @@ response_list(_, _DefaultTimeout, 0, <<>>) -> [];  %%no further data received af
 
 response_list(Sock, DefaultTimeout, ?SERVER_MORE_RESULTS_EXIST, Buff) ->
     {Packet, Rest} = recv_packet(Sock, DefaultTimeout, Buff),
-    {Response, ServerStatus, Rest2} = response(Sock, DefaultTimeout, Packet, Rest),
+    {Response, ServerStatus, Rest2} = parse_response(Sock, DefaultTimeout, Packet, Rest),
     [ Response | response_list(Sock, DefaultTimeout, ServerStatus band ?SERVER_MORE_RESULTS_EXIST, Rest2)].
 
 
@@ -66,10 +62,10 @@ recv_packet(Sock, DefaultTimeout, Buff) ->
     {Data, Rest} = recv_packet_body(Sock, PacketLength, DefaultTimeout, Buff2),
     {#packet{size=PacketLength, seq_num=SeqNum, data=Data}, Rest}.
 
-response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<0:8, Rest/binary>>}=_Packet, Buff) ->
+parse_response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<0:8, Rest/binary>>}=_Packet, Buff) ->
     {AffectedRows, Rest1} = lcb(Rest),
     {InsertId, Rest2} = lcb(Rest1),
-    <<ServerStatus:16/little, WarningCount:16/little, Msg/binary>> = Rest2, % (*)!
+    <<ServerStatus:16/little, WarningCount:16/little, Msg/binary>> = Rest2,
     { #ok_packet{
         seq_num = SeqNum,
         affected_rows = AffectedRows,
@@ -80,13 +76,13 @@ response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<0:8, Rest/binary>>}
       ServerStatus, Buff };
 
 % EOF: MySQL format <= 4.0, single byte. See -2-
-response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<?RESP_EOF:8>>}=_Packet, Buff) ->
+parse_response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<?RESP_EOF:8>>}=_Packet, Buff) ->
     { #eof_packet{
         seq_num = SeqNum },
       ?SERVER_NO_STATUS, Buff };
 
 % EOF: MySQL format >= 4.1, with warnings and status. See -2-
-response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<?RESP_EOF:8, WarningCount:16/little, ServerStatus:16/little>>}=_Packet, Buff) ->
+parse_response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<?RESP_EOF:8, WarningCount:16/little, ServerStatus:16/little>>}=_Packet, Buff) ->
     { #eof_packet{
         seq_num = SeqNum,
         status = ServerStatus,
@@ -94,7 +90,7 @@ response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<?RESP_EOF:8, Warnin
       ServerStatus, Buff };
 
 % ERROR response: MySQL format >= 4.1. See -3-
-response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:16/little, "#", SQLState:5/binary-unit:8, Msg/binary>>}=_Packet, Buff) ->
+parse_response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:16/little, "#", SQLState:5/binary-unit:8, Msg/binary>>}=_Packet, Buff) ->
     { #error_packet{
         seq_num = SeqNum,
         code = ErrNo,
@@ -103,7 +99,7 @@ response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:16/lit
      ?SERVER_NO_STATUS, Buff };
 
 % ERROR response: MySQL format <= 4.0. See -3-
-response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:16/little, Msg/binary>>}=_Packet, Buff) ->
+parse_response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:16/little, Msg/binary>>}=_Packet, Buff) ->
     { #error_packet{
         seq_num = SeqNum,
         code = ErrNo,
@@ -112,7 +108,7 @@ response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:16/lit
      ?SERVER_NO_STATUS, Buff };
 
 % DATA response.
-response(Sock, DefaultTimeout, #packet{seq_num = SeqNum, data = Data}=_Packet, Buff) ->
+parse_response(Sock, DefaultTimeout, #packet{seq_num = SeqNum, data = Data}=_Packet, Buff) ->
     {FieldCount, Rest1} = lcb(Data),
     {Extra, _} = lcb(Rest1),
     {SeqNum1, FieldList, Buff2} = recv_field_list(Sock, SeqNum+1, DefaultTimeout, Buff),
