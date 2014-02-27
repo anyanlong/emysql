@@ -24,7 +24,7 @@
 %% WHETHER IN AN ACTION OF CONTRACT,  TORT  OR OTHERWISE,  ARISING
 %% FROM,  OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR
 %% OTHER DEALINGS IN THE SOFTWARE.
-
+%% @private
 -module(emysql_tcp).
 -export([send_and_recv_packet/3, recv_packet/3, response/4]).
 
