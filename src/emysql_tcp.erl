@@ -323,7 +323,7 @@ to_timestamp(Data) ->
         _ ->
             exit({error, datetime})
     end.
-to_bit(<<1>>) -> 1;  %%TODO: is this right?.  Shouldn't be <<"1">> ?
+to_bit(<<1>>) -> 1;
 to_bit(<<0>>) -> 0.
 
 type_cast_row_data(undefined, _) -> undefined;
