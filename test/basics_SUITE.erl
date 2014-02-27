@@ -55,7 +55,7 @@ all() ->
      {group, conversion}].
 
 groups() ->
-    [{conversion, [],
+    [{conversion, [parallel],
         [dict_empty_test,
          dict_single_test,
          dict_multi_test,
