@@ -141,5 +141,4 @@
 -define(RESP_ERROR, 255).
 
 %% AUTH PLUGIN
--define(MYSQL_NATIVE_PASSWORD, "mysql_native_password").
--define(MYSQL_OLD_PASSWORD, "mysql_old_password").
+-define(MYSQL_OLD_PASSWORD, <<"mysql_old_password">>).
