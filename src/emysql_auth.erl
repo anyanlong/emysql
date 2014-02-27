@@ -41,21 +41,20 @@ handshake(Sock, User, Password) ->
     case parse_greeting(Packet) of
         {ok, #greeting { seq_num = SeqNum } = Greeting} ->
             Auth = auth(Sock, User, Password, Greeting#greeting { seq_num = SeqNum + 1 }),
-            check_handshake_auth(Auth),
-            Greeting;
+            check_handshake_auth(Auth, Greeting);
         {error, wrong_parse} -> 
             {#error_packet{ code = Code, msg = Msg},_, _Rest} =
                 emysql_tcp:response(Sock, emysql_app:default_timeout(), Packet, Unparsed),
-            exit({Code, Msg});
+            {error, {Code, Msg}};
         {greeting_failed, What} ->
-            exit({greeting_failed, What})
+            {error, {greeting_failed, What}}
     end.
 
 %% Internal functions
 %% -----------------------------------------------------------------
 
-check_handshake_auth(#ok_packet{}) -> ok;
-check_handshake_auth(#error_packet{} = Err) -> exit({failed_to_authenticate, Err}).
+check_handshake_auth(#ok_packet{}, Greeting) -> {ok, Greeting};
+check_handshake_auth(#error_packet{} = Err, _Greeting) -> {error, {auth_fail, Err}}.
 
 %% build_greeting/3 eats through the greeting string systematically
 %%   We build the greeting by traversing several stages. Each stage decodes yet

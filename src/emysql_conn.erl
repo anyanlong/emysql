@@ -191,11 +191,11 @@ open_connection(#pool{pool_id=PoolId, host=Host, port=Port, user=User,
     end.
 
 handshake(Sock, User, Password) ->
-   case catch emysql_auth:handshake(Sock, User, Password) of
-       {'EXIT', ExitReason} ->
+   case emysql_auth:handshake(Sock, User, Password) of
+       {ok, #greeting{} = G} -> G;
+       {error, Reason} ->
            gen_tcp:close(Sock),
-           exit(ExitReason);
-       #greeting{} = G -> G
+           exit(Reason)
    end.
 
 give_manager_control(Socket) ->
