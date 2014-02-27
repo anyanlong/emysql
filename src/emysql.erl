@@ -109,8 +109,7 @@
 -export([
             prepare/2,
             execute/2, execute/3, execute/4, execute/5,
-            default_timeout/0,
-            modules/0
+            default_timeout/0
 ]).
 
 %% Result Conversion API
@@ -176,29 +175,6 @@ start() ->
 %%
 stop() ->
     application:stop(emysql).
-
-%% @spec modules() -> list()
-%%
-%% @doc Returns the list of Emysql modules.
-%%
-%% === Sample ===
-%% ```
-%%  $ erl
-%%  1> crypto:start().
-%%  2> application:start(emysql).
-%%  3> emysql:modules().
-%%  [emysql,emysql_auth,emysql_conn,emysql_conn_mgr,
-%%   emysql_statements,emysql_tcp,emysql_tracer,emysql_util,
-%%   emysql_worker]
-%% '''
-%% === Implementation ===
-%%
-%% Simply a call to `emysql_app:modules()'.
-%% @private
-%% @end doc: hd feb 11
-%%
-modules() ->
-    emysql_app:modules().
 
 %% @spec default_timeout() -> Timeout
 %%      Timeout = integer()

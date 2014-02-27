@@ -25,7 +25,7 @@
 -module(emysql_app).
 -behaviour(application).
 
--export([start/2, stop/1, modules/0, default_timeout/0, lock_timeout/0, pools/0, conn_test_period/0]).
+-export([start/2, stop/1, default_timeout/0, lock_timeout/0, pools/0, conn_test_period/0]).
 
 -include("emysql.hrl").
 
@@ -42,10 +42,6 @@ stop(_State) ->
 	ok = lists:foreach(
 		fun (Pool) -> emysql:remove_pool(Pool#pool.pool_id) end,
 		emysql_conn_mgr:pools()).
-
-modules() ->
-	{ok, Modules} = application_controller:get_key(emysql, modules),
-	Modules.
 
 default_timeout() ->
     case application:get_env(emysql, default_timeout) of

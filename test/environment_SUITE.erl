@@ -31,9 +31,7 @@
         end_per_testcase/2,
 
         initializing_crypto_app/1,
-
         initializing_emysql_app/1,
-        accessing_emysql_module/1,
 
         connecting_to_db_and_creating_a_pool_transition/1,
         insert_a_record/1,
@@ -57,7 +55,6 @@ all() ->
     [
         initializing_crypto_app,
         initializing_emysql_app,
-        accessing_emysql_module,
         connecting_to_db_and_creating_a_pool_transition,
         insert_a_record,
         select_a_record,
@@ -143,11 +140,6 @@ initializing_emysql_app(_) ->
     application:start(emysql),
     ok.
 
-% Test Case: Test if the emysql module is available. This detects a path error.
-%%--------------------------------------------------------------------
-accessing_emysql_module(_) ->
-    emysql:modules(),
-    ok.
 %% Test case: test obsolete transitional API
 %%--------------------------------------------------------------------
 connecting_to_db_and_creating_a_pool_transition(_) ->
