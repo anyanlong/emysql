@@ -18,10 +18,9 @@
 -module(basics_SUITE).
 -compile(export_all).
 -include_lib("common_test/include/ct.hrl").
+-include("../include/emysql.hrl").
 
 -record(hello_record, {hello_text}).
-
--include("../include/emysql.hrl").
 
 %% Optional suite settings
 %%--------------------------------------------------------------------
@@ -52,8 +51,19 @@ all() ->
 	 delete_non_existant_procedure,
 	 select_by_stored_procedure,
      multiple_select,
-     encode_floating_point_data].
+     encode_floating_point_data,
+     {group, conversion}].
 
+groups() ->
+    [{conversion, [],
+        [dict_empty_test,
+         dict_single_test,
+         dict_multi_test,
+         proplist_empty_test,
+         proplist_single_test,
+         proplist_multi_test,
+         record_test]}
+    ].
 
 %% Optional suite pre test initialization
 %%--------------------------------------------------------------------
@@ -363,7 +373,155 @@ select_by_stored_procedure(_) ->
 	
 	ok.
 
+%%% Conversion routine tests
+%% --------------------------------------------------------------------------------------------
+
+dict_empty_test(_) ->
+    E = dict:from_list([]),
+    E = emysql_util:as_dict(get_empty_test()),
+    E = emysql:as_dict(get_empty_test()),
+    ok.
+
+dict_single_test(_) ->
+    E = dict:from_list([{<<"HelloField">>,<<"Hello">>}]),
+    E = emysql_util:as_dict(get_single_test()),
+    E = emysql:as_dict(get_single_test()),
+    ok.
+
+dict_multi_test(_) ->
+    E = dict:from_list([
+            {<<"HelloField">>,<<"Hello">>},
+            {<<"HiField">>,<<"Hi">>},
+            {<<"ByeField">>,<<"Bye">>}
+    ]),
+    E = emysql_util:as_dict(get_multi_test()),
+    E = emysql:as_dict(get_multi_test()),
+    ok.
+
+proplist_empty_test(_) ->
+    [] = emysql_util:as_proplist(get_empty_test()),
+    [] = emysql:as_proplist(get_empty_test()),
+    ok.
+
+proplist_single_test(_) ->
+    Expect = [ [{<<"HelloField">>,<<"Hello">>}] ],
+    Expect = emysql_util:as_proplist(get_single_test()),
+    Expect = emysql:as_proplist(get_single_test()),
+    ok.
+
+proplist_multi_test(_) ->
+    Expect = [ [{<<"HelloField">>,<<"Hello">>},{<<"HiField">>,<<"Hi">>},{<<"ByeField">>,<<"Bye">>}] ],
+    Expect = emysql_util:as_proplist(get_multi_test()),
+    Expect = emysql:as_proplist(get_multi_test()),
+    ok.
+
+-record(person, {surname, name, phone, socks}).
+record_test(_Config) ->
+    emysql:execute(test_pool, <<"DROP TABLE IF EXISTS as_record_test;">>),
+    emysql:execute(test_pool, <<"CREATE TABLE as_record_test (name varchar(60), surname varchar(60), socks int)">>),
+
+    emysql:prepare(ins, <<"INSERT INTO as_record_test (name, surname, socks) VALUES (?, ?, ?)">>),
+    emysql:execute(test_pool, ins, [<<"Maxim">>, <<"Komar">>, 3]),
+
+                        % test
+    Result = emysql:execute(test_pool, <<"select * from as_record_test">>),
+    Expected = [#person{ surname = <<"Komar">>, name = <<"Maxim">>, socks=3 }],
+    Expected = emysql_util:as_record(Result, person, record_info(fields, person)),
+    Expected = emysql:as_record(Result, person, record_info(fields, person)),
+    ok.
+
+
+%%% Data generation
+%% --------------------------------------------------------------------------------------------
 fields() ->
     [{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
                         <<"hello_table">>,<<"hello_text">>,<<"hello_text">>,
                         254,<<>>,33,60,0,0}].
+
+get_empty_test() ->
+    #result_packet {
+        seq_num = 5,
+        field_list = [#field {
+                        seq_num = 2,
+                        catalog = <<"def">>,
+                        db = <<>>,
+                        table = <<>>,
+                        org_table = <<>>,
+                        name = <<"HelloField">>,
+                        org_name = <<>>,
+                        type = 253,
+                        default = <<>>,
+                        charset_nr = 33,
+                        length = 15,
+                        flags = 1,
+                        decimals = 31 }],
+        rows = undefined,
+        extra = <<>>}.
+
+get_single_test() ->
+    #result_packet {
+        seq_num = 5,
+        field_list = [#field {
+                        seq_num = 2,
+                        catalog = <<"def">>,
+                        db = <<>>,
+                        table = <<>>,
+                        org_table = <<>>,
+                        name = <<"HelloField">>,
+                        org_name = <<>>,
+                        type = 253,
+                        default = <<>>,
+                        charset_nr = 33,
+                        length = 15,
+                        flags = 1,
+                        decimals = 31 }],
+        rows = [[<<"Hello">>]],
+        extra = <<>>}.
+
+get_multi_test() ->
+    #result_packet {
+        seq_num = 7,
+        field_list = [#field {
+                        seq_num = 2,
+                        catalog = <<"def">>,
+                        db = <<>>,
+                        table = <<>>,
+                        org_table = <<>>,
+                        name = <<"HelloField">>,
+                        org_name = <<>>,
+                        type = 253,
+                        default = <<>>,
+                        charset_nr = 33,
+                        length = 15,
+                        flags = 1,
+                        decimals = 31 },
+                      #field {
+                        seq_num = 3,
+                        catalog = <<"def">>,
+                        db = <<>>,
+                        table = <<>>,
+                        org_table = <<>>,
+                        name = <<"HiField">>,
+                        org_name = <<>>,
+                        type = 253,
+                        default = <<>>,
+                        charset_nr = 33,
+                        length = 6,
+                        flags = 1,
+                        decimals = 31 },
+                      #field {
+                        seq_num = 4,
+                        catalog = <<"def">>,
+                        db = <<>>,
+                        table = <<>>,
+                        org_table = <<>>,
+                        name = <<"ByeField">>,
+                        org_name = <<>>,
+                        type = 253,
+                        default = <<>>,
+                        charset_nr = 33,
+                        length = 9,
+                        flags = 1,
+                        decimals = 31 }],
+         rows = [[<<"Hello">>,<<"Hi">>,<<"Bye">>]],
+        extra = <<>>}.

@@ -77,7 +77,7 @@ CT_RUN = ct_run \
         -cover test/cover.spec -cover_stop false \
         $(CT_OPTS)
 # Currently, the order of the test cases matter!
-CT_SUITES=environment basics conn_mgr  emysql_util
+CT_SUITES=environment basics conn_mgr
 
 build-tests:
 	erlc -v -o test/ $(wildcard test/*.erl) -pa ebin/
