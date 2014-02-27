@@ -33,28 +33,19 @@
 -define(PACKETSIZE, 1460).
 
 send_and_recv_packet(Sock, Packet, SeqNum) ->
-    %-% io:format("~nsend_and_receive_packet: SEND SeqNum: ~p, Binary: ~p~n", [SeqNum, <<(size(Packet)):24/little, SeqNum:8, Packet/binary>>]),
-    %-% io:format("~p send_and_recv_packet: send~n", [self()]),
     case gen_tcp:send(Sock, <<(size(Packet)):24/little, SeqNum:8, Packet/binary>>) of
         ok ->
-            %-% io:format("~p send_and_recv_packet: send ok~n", [self()]),
             ok;
         {error, Reason} ->
-            %-% io:format("~p send_and_recv_packet: ERROR ~p -> EXIT~n", [self(), Reason]),
             exit({failed_to_send_packet_to_server, Reason})
     end,
-    %-% io:format("~p send_and_recv_packet: resonse_list~n", [self()]),
     DefaultTimeout = emysql_app:default_timeout(),
     case response_list(Sock, DefaultTimeout, ?SERVER_MORE_RESULTS_EXIST) of
         % This is a bit murky. It's compatible with former Emysql versions
         % but sometimes returns a list, e.g. for stored procedures,
         % since an extra OK package is sent at the end of their results.
-        [Record | []] ->
-            %-% io:format("~p send_and_recv_packet: record~n", [self()]),
-            Record;
-        List ->
-            %-% io:format("~p send_and_recv_packet: list~n", [self()]),
-            List
+        [Record] -> Record;
+        List -> List
     end.
 
 response_list(Sock, DefaultTimeout, ServerStatus) -> 
@@ -81,8 +72,8 @@ recv_packet(Sock, DefaultTimeout, Buff) ->
 
 response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<0:8, Rest/binary>>}=_Packet, Buff) ->
     %-% io:format("~nresponse (OK): ~p~n", [_Packet]),
-    {AffectedRows, Rest1} = emysql_util:length_coded_binary(Rest),
-    {InsertId, Rest2} = emysql_util:length_coded_binary(Rest1),
+    {AffectedRows, Rest1} = length_coded_binary(Rest),
+    {InsertId, Rest2} = length_coded_binary(Rest1),
     <<ServerStatus:16/little, WarningCount:16/little, Msg/binary>> = Rest2, % (*)!
     %-% io:format("- warnings: ~p~n", [WarningCount]),
     %-% io:format("- server status: ~p~n", [emysql_conn:hstate(ServerStatus)]),
@@ -136,8 +127,8 @@ response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:16/lit
 % DATA response.
 response(Sock, DefaultTimeout, #packet{seq_num = SeqNum, data = Data}=_Packet, Buff) ->
     %-% io:format("~nresponse (DATA): ~p~n", [_Packet]),
-    {FieldCount, Rest1} = emysql_util:length_coded_binary(Data),
-    {Extra, _} = emysql_util:length_coded_binary(Rest1),
+    {FieldCount, Rest1} = length_coded_binary(Data),
+    {Extra, _} = length_coded_binary(Rest1),
     {SeqNum1, FieldList, Buff2} = recv_field_list(Sock, SeqNum+1, DefaultTimeout, Buff),
     if
         length(FieldList) =/= FieldCount ->
@@ -205,15 +196,15 @@ recv_field_list(Sock, _SeqNum, DefaultTimeout, Acc, Buff) ->
 			%-% io:format("- eof~n", []),
                         {SeqNum1, lists:reverse(Acc), Unparsed};
         {#packet{seq_num = SeqNum1, data = Data}, Unparsed} ->
-			{Catalog, Rest2} = emysql_util:length_coded_string(Data),
-			{Db, Rest3} = emysql_util:length_coded_string(Rest2),
-			{Table, Rest4} = emysql_util:length_coded_string(Rest3),
-			{OrgTable, Rest5} = emysql_util:length_coded_string(Rest4),
-			{Name, Rest6} = emysql_util:length_coded_string(Rest5),
-			{OrgName, Rest7} = emysql_util:length_coded_string(Rest6),
+			{Catalog, Rest2} = length_coded_string(Data),
+			{Db, Rest3} = length_coded_string(Rest2),
+			{Table, Rest4} = length_coded_string(Rest3),
+			{OrgTable, Rest5} = length_coded_string(Rest4),
+			{Name, Rest6} = length_coded_string(Rest5),
+			{OrgName, Rest7} = length_coded_string(Rest6),
 			<<_:1/binary, CharSetNr:16/little, Length:32/little, Rest8/binary>> = Rest7,
 			<<Type:8/little, Flags:16/little, Decimals:8/little, _:2/binary, Rest9/binary>> = Rest8,
-			{Default, _} = emysql_util:length_coded_binary(Rest9),
+			{Default, _} = length_coded_binary(Rest9),
 			Field = #field{
 				seq_num = SeqNum1,
 				catalog = Catalog,
@@ -285,10 +276,6 @@ decode_row_data(<<253:8, Length:24/little, Data:Length/binary, Tail/binary>>, [F
     [type_cast_row_data(Data, Field) | decode_row_data(Tail, Rest)];
 decode_row_data(<<254:8, Length:64/little, Data:Length/binary, Tail/binary>>, [Field|Rest]) ->
     [type_cast_row_data(Data, Field) | decode_row_data(Tail, Rest)].
-
-%decode_row_data(Bin, [Field|Rest], Acc) ->
-%    {Data, Tail} = emysql_util:length_coded_string(Bin),
-%    decode_row_data(Tail, Rest, [type_cast_row_data(Data, Field)|Acc]).
 
 cast_fun_for(Type) ->
     Map = [{?FIELD_TYPE_VARCHAR, fun identity/1},
@@ -524,3 +511,36 @@ type_cast_row_data(Data, #field{decoder = F}) -> F(Data).
 %                     Expect the message to be between 0 and 512 bytes long.
 %
 % Source: http://forge.mysql.com/wiki/MySQL_Internals_ClientServer_Protocol
+
+
+length_coded_binary(<<>>) -> {<<>>, <<>>};
+length_coded_binary(<<FirstByte:8, Tail/binary>>) ->
+    if
+        FirstByte =< 250 -> {FirstByte, Tail};
+        FirstByte == 251 -> {undefined, Tail};
+        FirstByte == 252 ->
+            <<Word:16/little, Tail1/binary>> = Tail,
+            {Word, Tail1};
+        FirstByte == 253 ->
+            <<Word:24/little, Tail1/binary>> = Tail,
+            {Word, Tail1};
+        FirstByte == 254 ->
+            <<Word:64/little, Tail1/binary>> = Tail,
+            {Word, Tail1};
+        true ->
+            exit(poorly_formatted_length_encoded_binary)
+    end.
+
+length_coded_string(<<>>) -> {<<>>, <<>>};
+length_coded_string(Bin) ->
+    case length_coded_binary(Bin) of
+        {undefined, Rest} ->
+            {undefined, Rest};
+        {Length, Rest} ->
+            case Rest of
+                <<String:Length/binary, Rest1/binary>> ->
+                    {String, Rest1};
+                _ ->
+                    exit(poorly_formatted_length_coded_string)
+            end
+    end.

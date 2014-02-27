@@ -28,8 +28,10 @@
 
 %% Query data
 -export([
-         affected_rows/1,
-          result_type/1
+	affected_rows/1,
+	result_type/1,
+         field_names/1,
+         insert_id/1
 ]).
         
 %% Conversion routines
@@ -40,27 +42,18 @@
          as_record/3,
          as_record/4
 ]).
-		
--export([
-         encode/1,
-         encode/2,
-         field_names/1,
-         insert_id/1,
-         length_coded_binary/1,
-         length_coded_string/1,
-         null_terminated_string/2,
-         quote/1,
-         to_binary/1
-        ]).
 
 -include("emysql.hrl").
 
+%% @doc Return the field names of a result packet
+%% @end
+-spec field_names(Result) -> [Name]
+  when
+    Result :: #result_packet{},
+    Name :: binary().
 field_names(#result_packet{field_list=FieldList}) ->
     [Field#field.name || Field <- FieldList].
 
-%% @spec as_dict(Result) -> dict
-%%      Result = #result_packet{}
-%%
 %% @doc package row data as a dict
 %%
 %% -module(fetch_example).
@@ -68,6 +61,10 @@ field_names(#result_packet{field_list=FieldList}) ->
 %% fetch_foo() ->
 %%  Res = emysql:execute(pool1, "select * from foo"),
 %%  Res:as_dict(Res).
+-spec as_dict(Result) -> Dict
+  when
+    Result :: #result_packet{},
+    Dict :: dict().
 as_dict(Res = #result_packet{}) ->
     dict:from_list(lists:flatten(as_proplist(Res))).
 
@@ -81,6 +78,10 @@ as_dict(Res = #result_packet{}) ->
 %% fetch_foo() ->
 %%  Res = emysql:execute(pool1, "select * from foo"),
 %%  Res:as_proplist(Res).
+-spec as_proplist(Result) -> [PropRow]
+   when
+     Result :: #result_packet{},
+     PropRow :: proplists:proplist().
 as_proplist(#result_packet{field_list=_Cols,rows=_Rows}) when _Cols =:= undefined,
                                                               _Rows =:= undefined ->
     [];
@@ -155,46 +156,6 @@ json_val({datetime,{ {Year,Month,Day}, {Hour,Min,Sec} }}) ->
 json_val(Value) ->
     Value.
 
-length_coded_binary(<<>>) -> {<<>>, <<>>};
-length_coded_binary(<<FirstByte:8, Tail/binary>>) ->
-    if
-        FirstByte =< 250 -> {FirstByte, Tail};
-        FirstByte == 251 -> {undefined, Tail};
-        FirstByte == 252 ->
-            <<Word:16/little, Tail1/binary>> = Tail,
-            {Word, Tail1};
-        FirstByte == 253 ->
-            <<Word:24/little, Tail1/binary>> = Tail,
-            {Word, Tail1};
-        FirstByte == 254 ->
-            <<Word:64/little, Tail1/binary>> = Tail,
-            {Word, Tail1};
-        true ->
-            exit(poorly_formatted_length_encoded_binary)
-    end.
-
-length_coded_string(<<>>) -> {<<>>, <<>>};
-length_coded_string(Bin) ->
-    case length_coded_binary(Bin) of
-        {undefined, Rest} ->
-            {undefined, Rest};
-        {Length, Rest} ->
-            case Rest of
-                <<String:Length/binary, Rest1/binary>> ->
-                    {String, Rest1};
-                _ ->
-                    exit(poorly_formatted_length_coded_string)
-            end
-    end.
-
-null_terminated_string(<<0, Tail/binary>>, Acc) ->
-    {Acc, Tail};
-null_terminated_string(<<_:8>>, _) ->
-    exit(poorly_formatted_null_terminated_string);
-null_terminated_string(<<H:1/binary, Tail/binary>>, Acc) ->
-    null_terminated_string(Tail, <<Acc/binary, H/binary>>).
-
-
 %% @doc insert_id/1 extracts the Insert ID from an OK Packet
 %% @end
 -spec insert_id(#ok_packet{}) -> integer() | binary().
@@ -207,130 +168,9 @@ insert_id(#ok_packet{insert_id=ID}) ->
 affected_rows(#ok_packet{affected_rows=Rows}) ->
     Rows.
 
-
-%% @doc Encode a value so that it can be included safely in a MySQL query.
-%% @spec encode(term()) -> binary() | {error, Error}
-encode(Val) ->
-    encode(Val, binary).
-
-%% @doc Encode a value so that it can be included safely in a MySQL query.
-%% @spec encode(term(), list | binary) -> string() | binary() | {error, Error}
-encode(null, list) ->
-    "null";
-encode(undefined, list) ->
-    "null";
-encode(null, binary)  ->
-    <<"null">>;
-encode(undefined, binary)  ->
-    <<"null">>;
-encode(Val, list) when is_binary(Val) ->
-    quote(binary_to_list(Val));
-encode(Val, binary) when is_atom(Val) ->
-    encode(atom_to_list(Val), binary);
-encode(Val, binary) when is_list(Val) ->
-    list_to_binary(quote(Val));
-encode(Val, binary) when is_binary(Val) ->
-    list_to_binary(quote(binary_to_list(Val)));
-encode(Val, list) when is_list(Val) ->
-    quote(Val);
-encode(Val, list) when is_integer(Val) ->
-    integer_to_list(Val);
-encode(Val, binary) when is_integer(Val) ->
-    list_to_binary(integer_to_list(Val));
-encode(Val, list) when is_float(Val) ->
-    [Res] = io_lib:format("~w", [Val]),
-    Res;
-encode(Val, binary) when is_float(Val) ->
-    iolist_to_binary(io_lib:format("~w", [Val]));
-encode({datetime, Val}, ReturnType) ->
-    encode(Val, ReturnType);
-encode({date, Val}, ReturnType) ->
-    encode(Val, ReturnType);
-encode({time, Val}, ReturnType) ->
-    encode(Val, ReturnType);
-encode({{Year, Month, Day}, {Hour, Minute, Second}}, list) ->
-    Res = io_lib:format("'~4.4.0w-~2.2.0w-~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w'",
-                        [Year, Month, Day, Hour, Minute, Second]),
-    lists:flatten(Res);
-encode({{_Year, _Month, _Day}, {_Hour, _Minute, _Second}}=Val, binary) ->
-    list_to_binary(encode(Val, list));
-encode({Time1, Time2, Time3}, list) ->
-    Res = two_digits([Time1, Time2, Time3]),
-    lists:flatten(Res);
-encode({_Time1, _Time2, _Time3}=Val, binary) ->
-    list_to_binary(encode(Val, list));
-encode(Val, _) ->
-    {error, {unrecognized_value, Val}}.
-
-%% @private
-two_digits(Nums) when is_list(Nums) ->
-    [two_digits(Num) || Num <- Nums];
-two_digits(Num) ->
-    [Str] = io_lib:format("~b", [Num]),
-    case length(Str) of
-        1 -> [$0 | Str];
-        _ -> Str
-    end.
-
-%% @doc Quote a string or binary value so that it can be included safely in a
-%% MySQL query. For the quoting, a binary is converted to a list and back.
-%% For this, it's necessary to know the encoding of the binary.
-%% @spec quote(x()) -> x()
-%%       x() = list() | binary()
+%% @doc result_type/1 decodes a packet into its type
 %% @end
-%% hd/11,12
-quote(String) when is_list(String) ->
-    [39 | lists:reverse([39 | quote_loop(String)])]. %% 39 is $'
-
-%% @doc  Make MySQL-safe backslash escapes before 10, 13, \, 26, 34, 39.
-%% @spec quote_loop(list()) -> list()
-%% @private
-%% @end
-%% hd/11,12
-quote_loop(List) ->
-    quote_loop(List, []).
-
-quote_loop([], Acc) ->
-    Acc;
-
-quote_loop([0 | Rest], Acc) ->
-    quote_loop(Rest, [$0, $\\ | Acc]);
-
-quote_loop([10 | Rest], Acc) ->
-    quote_loop(Rest, [$n, $\\ | Acc]);
-
-quote_loop([13 | Rest], Acc) ->
-    quote_loop(Rest, [$r, $\\ | Acc]);
-
-quote_loop([$\\ | Rest], Acc) ->
-    quote_loop(Rest, [$\\ , $\\ | Acc]);
-
-quote_loop([39 | Rest], Acc) -> %% 39 is $'
-    quote_loop(Rest, [39, $\\ | Acc]); %% 39 is $'
-
-quote_loop([34 | Rest], Acc) -> %% 34 is $"
-    quote_loop(Rest, [34, $\\ | Acc]); %% 34 is $"
-
-quote_loop([26 | Rest], Acc) ->
-    quote_loop(Rest, [$Z, $\\ | Acc]);
-
-quote_loop([C | Rest], Acc) ->
-    quote_loop(Rest, [C | Acc]).
-
 result_type(#ok_packet{})     -> ok;
 result_type(#result_packet{}) -> result;
 result_type(#error_packet{})  -> error;
 result_type(#eof_packet{})    -> eof.
-
-%% UTF-8 is designed in such a way that ISO-latin-1 characters with
-%% numbers beyond the 7-bit ASCII range are seldom considered valid
-%% when decoded as UTF-8. Therefore one can usually use heuristics
-%% to determine if a file is in UTF-8 or if it is encoded in
-%% ISO-latin-1 (one byte per character) encoding. The unicode module
-%% can be used to determine if data can be interpreted as UTF-8.
-%% Source: http://www.erlang.org/doc/apps/stdlib/unicode_usage.html
-
-to_binary(L) when is_binary(L) -> L;
-to_binary(L) when is_list(L)   -> list_to_binary(L).
-
-

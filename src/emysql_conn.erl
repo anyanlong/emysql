@@ -42,30 +42,24 @@ set_database(Connection, Database) ->
     Packet = <<?COM_QUERY, "use `", (iolist_to_binary(Database))/binary, "`">>,  % todo: utf8?
     emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
 
-set_encoding(_, undefined) ->
-    ok;
+set_encoding(_, undefined) -> ok;
 set_encoding(Connection, Encoding) ->
     Packet = <<?COM_QUERY, "set names '", (erlang:atom_to_binary(Encoding, utf8))/binary, "'">>,
     emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
 
-execute(Connection, Query, []) when is_list(Query) ->
-     %-% io:format("~p execute list: ~p using connection: ~p~n", [self(), iolist_to_binary(Query), Connection#emysql_connection.id]),
-    Packet = <<?COM_QUERY, (emysql_util:to_binary(Query))/binary>>,
-    % Packet = <<?COM_QUERY, (iolist_to_binary(Query))/binary>>,
-    emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0);
-
-execute(Connection, Query, []) when is_binary(Query) ->
-     %-% io:format("~p execute binary: ~p using connection: ~p~n", [self(), Query, Connection#emysql_connection.id]),
-    Packet = <<?COM_QUERY, Query/binary>>,
-    % Packet = <<?COM_QUERY, (iolist_to_binary(Query))/binary>>,
-    emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0);
+%% @todo This can go away once the underlying socket accepts IOData
+canonicalize_query(Q) when is_binary(Q) -> Q;
+canonicalize_query(QL) when is_list(QL) -> iolist_to_binary(QL).
 
 execute(Connection, StmtName, []) when is_atom(StmtName) ->
     prepare_statement(Connection, StmtName),
     StmtNameBin = atom_to_binary(StmtName, utf8),
     Packet = <<?COM_QUERY, "EXECUTE ", StmtNameBin/binary>>,
     emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0);
-
+execute(#emysql_connection { socket = Sock }, Query, []) ->
+    QB = canonicalize_query(Query),
+    Packet = <<?COM_QUERY, QB/binary>>,
+    emysql_tcp:send_and_recv_packet(Sock, Packet, 0);
 execute(Connection, Query, Args) when (is_list(Query) orelse is_binary(Query)) andalso is_list(Args) ->
     StmtName = "stmt_"++integer_to_list(erlang:phash2(Query)),
     ok = prepare(Connection, StmtName, Query),
@@ -96,7 +90,7 @@ execute(Connection, StmtName, Args) when is_atom(StmtName), is_list(Args) ->
 prepare(Connection, Name, Statement) when is_atom(Name) ->
     prepare(Connection, atom_to_list(Name), Statement);
 prepare(Connection, Name, Statement) ->
-    StatementBin = emysql_util:encode(Statement, binary),
+    StatementBin = encode(Statement, binary),
     Packet = <<?COM_QUERY, "PREPARE ", (list_to_binary(Name))/binary, " FROM ", StatementBin/binary>>,  % todo: utf8?
     case emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0) of
         OK when is_record(OK, ok_packet) ->
@@ -316,8 +310,8 @@ set_params(Connection, Num, Values, _) ->
 	emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
 
 set_params_packet(NumStart, Values) ->
-	BinValues = [emysql_util:encode(Val, binary) || Val <- Values],
-	BinNums = [emysql_util:encode(Num, binary) || Num <- lists:seq(NumStart, NumStart + length(Values) - 1)],
+	BinValues = [encode(Val, binary) || Val <- Values],
+	BinNums = [encode(Num, binary) || Num <- lists:seq(NumStart, NumStart + length(Values) - 1)],
 	BinPairs = lists:zip(BinNums, BinValues),
 	Parts = [<<"@", NumBin/binary, "=", ValBin/binary>> || {NumBin, ValBin} <- BinPairs], 
 	Sets = list_to_binary(join(Parts, <<",">>)),
@@ -354,3 +348,107 @@ hstate(State) ->
        case (State band ?SERVER_STATUS_AUTOCOMMIT)   of 0 -> ""; _-> "AUTOCOMMIT " end
     ++ case (State band ?SERVER_MORE_RESULTS_EXIST)  of 0 -> ""; _-> "MORE_RESULTS_EXIST " end
     ++ case (State band ?SERVER_QUERY_NO_INDEX_USED) of 0 -> ""; _-> "NO_INDEX_USED " end.
+
+%% @doc Encode a value so that it can be included safely in a MySQL query.
+%% @spec encode(term(), list | binary) -> string() | binary() | {error, Error}
+encode(null, list) ->
+    "null";
+encode(undefined, list) ->
+    "null";
+encode(null, binary)  ->
+    <<"null">>;
+encode(undefined, binary)  ->
+    <<"null">>;
+encode(Val, list) when is_binary(Val) ->
+    quote(binary_to_list(Val));
+encode(Val, binary) when is_atom(Val) ->
+    encode(atom_to_list(Val), binary);
+encode(Val, binary) when is_list(Val) ->
+    list_to_binary(quote(Val));
+encode(Val, binary) when is_binary(Val) ->
+    list_to_binary(quote(binary_to_list(Val)));
+encode(Val, list) when is_list(Val) ->
+    quote(Val);
+encode(Val, list) when is_integer(Val) ->
+    integer_to_list(Val);
+encode(Val, binary) when is_integer(Val) ->
+    list_to_binary(integer_to_list(Val));
+encode(Val, list) when is_float(Val) ->
+    [Res] = io_lib:format("~w", [Val]),
+    Res;
+encode(Val, binary) when is_float(Val) ->
+    iolist_to_binary(io_lib:format("~w", [Val]));
+encode({datetime, Val}, ReturnType) ->
+    encode(Val, ReturnType);
+encode({date, Val}, ReturnType) ->
+    encode(Val, ReturnType);
+encode({time, Val}, ReturnType) ->
+    encode(Val, ReturnType);
+encode({{Year, Month, Day}, {Hour, Minute, Second}}, list) ->
+    Res = io_lib:format("'~4.4.0w-~2.2.0w-~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w'",
+                        [Year, Month, Day, Hour, Minute, Second]),
+    lists:flatten(Res);
+encode({{_Year, _Month, _Day}, {_Hour, _Minute, _Second}}=Val, binary) ->
+    list_to_binary(encode(Val, list));
+encode({Time1, Time2, Time3}, list) ->
+    Res = two_digits([Time1, Time2, Time3]),
+    lists:flatten(Res);
+encode({_Time1, _Time2, _Time3}=Val, binary) ->
+    list_to_binary(encode(Val, list));
+encode(Val, _) ->
+    {error, {unrecognized_value, Val}}.
+    
+%% @private
+two_digits(Nums) when is_list(Nums) ->
+    [two_digits(Num) || Num <- Nums];
+two_digits(Num) ->
+    [Str] = io_lib:format("~b", [Num]),
+    case length(Str) of
+        1 -> [$0 | Str];
+        _ -> Str
+    end.
+
+%% @doc Quote a string or binary value so that it can be included safely in a
+%% MySQL query. For the quoting, a binary is converted to a list and back.
+%% For this, it's necessary to know the encoding of the binary.
+%% @spec quote(x()) -> x()
+%%       x() = list() | binary()
+%% @end
+%% hd/11,12
+quote(String) when is_list(String) ->
+    [39 | lists:reverse([39 | quote_loop(String)])]. %% 39 is $'
+
+%% @doc  Make MySQL-safe backslash escapes before 10, 13, \, 26, 34, 39.
+%% @spec quote_loop(list()) -> list()
+%% @private
+%% @end
+%% hd/11,12
+quote_loop(List) ->
+    quote_loop(List, []).
+
+quote_loop([], Acc) ->
+    Acc;
+
+quote_loop([0 | Rest], Acc) ->
+    quote_loop(Rest, [$0, $\\ | Acc]);
+
+quote_loop([10 | Rest], Acc) ->
+    quote_loop(Rest, [$n, $\\ | Acc]);
+
+quote_loop([13 | Rest], Acc) ->
+    quote_loop(Rest, [$r, $\\ | Acc]);
+
+quote_loop([$\\ | Rest], Acc) ->
+    quote_loop(Rest, [$\\ , $\\ | Acc]);
+
+quote_loop([39 | Rest], Acc) -> %% 39 is $'
+    quote_loop(Rest, [39, $\\ | Acc]); %% 39 is $'
+
+quote_loop([34 | Rest], Acc) -> %% 34 is $"
+    quote_loop(Rest, [34, $\\ | Acc]); %% 34 is $"
+
+quote_loop([26 | Rest], Acc) ->
+    quote_loop(Rest, [$Z, $\\ | Acc]);
+
+quote_loop([C | Rest], Acc) ->
+    quote_loop(Rest, [C | Acc]).
