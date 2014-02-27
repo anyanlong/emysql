@@ -36,6 +36,37 @@
 
 -include("emysql.hrl").
 
+%% MYSQL COMMANDS
+-define(COM_SLEEP, 16#00).
+-define(COM_QUIT, 16#01).
+-define(COM_INIT_DB, 16#02).
+-define(COM_QUERY, 16#03).
+-define(COM_FIELD_LIST, 16#04).
+-define(COM_CREATE_DB, 16#05).
+-define(COM_DROP_DB, 16#06).
+-define(COM_REFRESH, 16#07).
+-define(COM_SHUTDOWN, 16#08).
+-define(COM_STATISTICS, 16#09).
+-define(COM_PROCESS_INFO, 16#0a).
+-define(COM_CONNECT, 16#0b).
+-define(COM_PROCESS_KILL, 16#0c).
+-define(COM_DEBUG, 16#0d).
+-define(COM_PING, 16#0e).
+-define(COM_TIME, 16#0f).
+-define(COM_DELAYED_INSERT, 16#10).
+-define(COM_CHANGE_USER, 16#11).
+-define(COM_BINLOG_DUMP, 16#12).
+-define(COM_TABLE_DUMP, 16#13).
+-define(COM_CONNECT_OUT, 16#14).
+-define(COM_REGISTER_SLAVE, 16#15).
+-define(COM_STMT_PREPARE, 16#16).
+-define(COM_STMT_EXECUTE, 16#17).
+-define(COM_STMT_SEND_LONG_DATA, 16#18).
+-define(COM_STMT_CLOSE, 16#19).
+-define(COM_STMT_RESET, 16#1a).
+-define(COM_SET_OPTION, 16#1b).
+-define(COM_STMT_FETCH, 16#1c).
+
 set_database(_, undefined) -> ok;
 set_database(_, Empty) when Empty == ""; Empty == <<>> -> ok;
 set_database(Connection, Database) ->

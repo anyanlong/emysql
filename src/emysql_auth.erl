@@ -33,6 +33,8 @@
 -export([handshake/3]).
 
 -include("emysql.hrl").
+-include("emysql_internal.hrl").
+
 -include("crypto_compat.hrl").
 
 %% API
@@ -93,7 +95,7 @@ build_greeting({stage3, SaltLength}, D, G) ->
     }.
 
 %% parse_greeting/1 figures out what the greeting packet is all about
-parse_greeting(#packet { data = <<255, _/binary>> }) ->
+parse_greeting(#packet { data = <<?RESP_ERROR, _/binary>> }) ->
     {error, wrong_parse};
 parse_greeting(#packet { data = <<ProtocolVersion:8/integer, Rest1/binary>>, seq_num = SeqNo }) ->
     G = build_greeting(stage1, Rest1, #greeting { protocol_version = ProtocolVersion,
