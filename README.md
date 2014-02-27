@@ -242,6 +242,7 @@ Sample programs are in ./samples.
 * [d\_prepared\_statement](http://github.com/Eonblast/Emysql/blob/master/samples/d_prepared_statement.erl) - Using prepared statements
 * [e\_stored\_procedure](http://github.com/Eonblast/Emysql/blob/master/samples/e_stored_procedure.erl) - Using stored procedures
 * [f\_load\_from\_file](http://github.com/Eonblast/Emysql/blob/master/samples/f_load_from_file.erl) - Fast loading of data from a flat file
+* [g\_rows\_as\_json](http://github.com/Eonblast/Emysql/blob/master/samples/g_rows_as_json.erl) - Conversion of database rows into JSON
 
 To run the samples, create the database as listed above at localhost, and simply run the compile & run batches:
 
@@ -274,22 +275,17 @@ The Emysql driver is an Erlang gen-server, and, application.
 
 #### Adding a Pool                                  <a name="Adding_a_Pool"></a>
 
-	% emysql:add_pool(PoolName, PoolSize, Username, Password, Host, Port, Database, Encoding) ->
-	%	 ok | {error, pool_already_exists}  
-	% PoolName = atom()  
-	% PoolSize = integer()  
-	% Username = string()  
-	% Password = string()  
-	% Host = string()  
-	% Port = integer()  
-	% Database = string()  
-	% Encoding = undefined | atom()
-	
-	emysql:add_pool(mypoolname, 1, "username", "mypassword", "localhost", 3306, "mydatabase", utf8).
-
-  If ``Encoding`` is ``undefined``, then no encoding is set.
+To add a pool, you need to use one of the `emysql:add_pool/K` variants. I recommend using
+`emysql:add_pool/2` which takes a proplist of parameters and is a bit easier to work with
+rather than getting a parameter list correct. See the documentation for what options the
+add_pool call accepts.
 
 #### More Record Types
+
+Emysql usually operates with a number of different record types from the database. The driver
+returns "raw" responses as "packets" and leaves it up to the calling application to handle
+the result, usually by using one of the conversion routines in `emysql` to turn the data into
+a more suitable format.
 
 	-record(result_packet, {seq_num, field_list, rows, extra}).
 	
@@ -350,7 +346,7 @@ For other record types, see include/emysql.hrl.
  
 #### Converting Row Data To Records
 
-	% emysql_util:as_record(ResultPacket, RecordName, Fields) -> Result  
+	% emysql:as_record(ResultPacket, RecordName, Fields) -> Result  
 	% ResultPacket = result_packet()  
 	% RecordName = atom() (the name of the record to generate)  
 	% Fields = [atom()] (the field names to generate for each record)  
@@ -361,20 +357,20 @@ For other record types, see include/emysql.hrl.
 	
 	fetch_foo() ->
 	   Result = emysql:execute(pool1, <<"select bar, baz, bat from foo">>),
-	   Recs = emysql_util:as_record(Result, foo, record_info(fields, foo)),
+	   Recs = emysql:as_record(Result, foo, record_info(fields, foo)),
 	   [begin
 		  io:format("foo: ~p, ~p, ~p~n", [Foo#foo.bar, Foo#foo.baz, Foo#foo.bat])
 	    end || Foo <- Recs].
 
 #### Converting Row Data To JSON
 
-	% emysql_util:as_json(ResultPacket) -> Result
+	% emysql:as_json(ResultPacket) -> Result
 	% Result = [json()]
 
 	Result = emysql:execute(pool1, <<"select bar, baz from foo">>),
 
-	JSON = emysql_util:as_json(Result).
-	#[[{<<"bar">>,<<"bar_value">>}, {<<"baz">>,<<"baz_value">>}], ...]
+	JSON = emysql:as_json(Result).
+	% [[{<<"bar">>,<<"bar_value">>}, {<<"baz">>,<<"baz_value">>}], ...]
 
 Note that you are getting back a list of erlang terms in accordance with EEP-18.
 For actual utf8 binary JSON string you will need external library like [jsx](https://github.com/talentdeficit/jsx) or [jiffy](https://github.com/davisp/jiffy)
@@ -422,144 +418,9 @@ Some tests can take up to half a minute to finish on a slow machine.
 
 These tests currently check access to the database (environment suite) the same functionality as the samples (basics suite) and for race conditions as described in issue #9. Thank you, Ransom!
 
-### Encoding Tests
+To look at the tests, open `logs/index.html` in a browser:
 
-Currently the main focus is on Unicode test cases and encoding conversions,
-in the suites utf8_SUITE, latin_SUITE, utf8_to_latindb_SUITE,
-latin_to_utf8db_SUITE. Especially the silent conversions of list strings
-to the appropriate binary format were a bit of a challenge. 
-
-For the encoding tests, please create these databases:
-
-	  create database hello_utf8_database character set utf8;
-	  use hello_utf8_database;
-	  create table hello_table (hello_text char(20));
-	  grant all privileges on hello_utf8_database.* to hello_username@localhost identified by 'hello_password';
-	  
-	  create database hello_latin1_database character set latin1;
-	  use hello_latin1_database;
-	  create table hello_table (hello_text char(20));
-	  grant all privileges on hello_latin1_database.* to hello_username@localhost identified by 'hello_password';
-
-To run the encoding tests do:
-
-	make encoding-test
-	
-To run all tests (this includes issue tests, see below):
-
-	make all-test
-	
-
-You see the test results when opening test/index.html with a browser. It should look like this:
-
-<div style="border: 2px solid black; margin: 10px; font-size: 0.6em;">
-<CENTER>
-<H3>Test Results</H3>
-</CENTER>
-<BR />
-<CENTER>
-<A HREF="#">All test runs in "test"</A>
-<br /><br />
-<TABLE border="3" cellpadding="5" BGCOLOR="#E4F0FE" style="font-size: 0.7em;">
-<tr>
-<th>Test Name</th>
-<th>Label</th>
-<th>Test Run Started</th>
-<th><font color="#E4F0FE">_</font>Ok<font color="#E4F0FE">_</font></th>
-<th>Failed</th>
-<th>Skipped<br />(User/Auto)</th>
-
-<th>Missing<br />Suites</th>
-<th>Node</th>
-</tr>
-
-<TR valign="top">
-<TD><FONT SIZE="-1"><A HREF="">me.Emysql. basics_SUITE</A></FONT></TD>
-<TD ALIGN="center"><FONT SIZE="-1"><B>-</B></FONT></TD>
-<TD><FONT SIZE="-1">Tue Dec 13 2011 04:17:29</FONT></TD>
-
-<TD ALIGN="right">7</TD>
-<TD ALIGN="right">0</TD>
-<TD ALIGN="right">0 (0/0)</TD>
-<TD ALIGN="right">0</TD>
-<TD ALIGN="right"><FONT SIZE="-1">ct@machine</FONT></TD>
-
-</TR>
-<TR valign="top">
-<TD><FONT SIZE="-1"><A HREF="">me.Emysql. environment_SUITE</A></FONT></TD>
-
-<TD ALIGN="center"><FONT SIZE="-1"><B>-</B></FONT></TD>
-<TD><FONT SIZE="-1">Tue Dec 13 2011 04:17:29</FONT></TD>
-<TD ALIGN="right">6</TD>
-<TD ALIGN="right">0</TD>
-<TD ALIGN="right">0 (0/0)</TD>
-<TD ALIGN="right">0</TD>
-<TD ALIGN="right"><FONT SIZE="-1">ct@machine</FONT></TD>
-
-</TR>
-<TR valign="top">
-<TD><B>Total</B></TD><TD> </TD>
-<TD> </TD>
-<TD ALIGN="right"><B>13</B></TD>
-<TD ALIGN="right"><B>0</B></TD>
-<TD ALIGN="right">0 (0/0)</TD>
-<TD ALIGN="right"><B>0</B></TD>
-<TD ></TD>
-</TR>
-</TABLE>
-
-</CENTER>
-<P /><CENTER>
-<BR /><BR />
-<HR />
-<P /><FONT SIZE="-1">
-Copyright (C) 2011 <A HREF="">Open Telecom Platform</A><BR />
-Updated: Tue Dec 13 2011 04:17:36<BR/>
-</FONT>
-</CENTER>
-</div>
-
-### Issue Tests
-#### Issue 20
-There is a test to check on issue #20. For this test you need 
-two databases like this:
-
-	$ mysql [-u<user> -p]
-	mysql> create database test1;
-	mysql> create database test2;
-	mysql> grant all privileges on test1.* to test@localhost identified by 'test';
-	mysql> grant all privileges on test2.* to test@localhost identified by 'test';
-	mysql> use test1;
-	mysql> CREATE TABLE `test` ( `a` int(11) NOT NULL );
-	mysql> use test2;
-	mysql> CREATE TABLE `test` ( `b` int(11) NOT NULL );
-
-The test suite is test/pool_SUITE.erl. To run the test, use make:
-
-	make test20
-	
-Check the test results by opening test/index.html with a browser. 
-
-#### Issue 9
-The probably rare but still bad races of issue #9 have been solved at long last, courtesy of Ransom Richardson. They are tested for as part of the standard test. You can also use:
-
-	make test9
-	
-Check the test results by opening test/index.html with a browser. 
-
-### Util Tests
-For this test you need database like this:
-
-	$ mysql [-u<user> -p]
-	create database test_database;
-	grant all privileges on test_database.* to test_username@localhost identified by 'test_password';
-	flush privileges;
-
-The test suite is test/as_record_SUITE.erl. To run the test, use make:
-
-	make testutil
-
-Check the test results by opening test/index.html with a browser.
+	open logs/index.html # Will work on a Mac for instance
 
 ## History                                               <a name="History"></a>
 
@@ -585,7 +446,7 @@ Fredrik, Nick and Jacob helped shedding light on the matter. Thank you very much
 
 [1]: http://github.com/JacobVorreuter/emysql "emysql"  
 [2]: http://github.com/dizzyd/erlang-mysql-driver "erlang-mysql-driver"   
-[3]: http://www.kth.se/ "Royal Institure of Technology"   
+[3]: http://www.kth.se/ "Royal Institute of Technology"   
 [4]: https://github.com/fredrikt/yxa/tree/master/src/mysql "Yxa mysql driver"   
 [5]: http://www.stacken.kth.se/project/yxa/index.html "Yxa Home"   
 [6]: https://github.com/fredrikt/yxa "Yxa repository at github"   
