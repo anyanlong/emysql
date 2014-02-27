@@ -62,22 +62,14 @@ response_list(Sock, DefaultTimeout, ?SERVER_MORE_RESULTS_EXIST, Buff) ->
 
 
 recv_packet(Sock, DefaultTimeout, Buff) ->
-    %-% io:format("~p recv_packet~n", [self()]),
-    %-% io:format("~p recv_packet: recv_packet_header~n", [self()]),
     {PacketLength, SeqNum, Buff2} = recv_packet_header(Sock, DefaultTimeout, Buff),
-    %-% io:format("~p recv_packet: recv_packet_body~n", [self()]),
     {Data, Rest} = recv_packet_body(Sock, PacketLength, DefaultTimeout, Buff2),
-    %-% io:format("~nrecv_packet: len: ~p, data: ~p~n", [PacketLength, Data]),
     {#packet{size=PacketLength, seq_num=SeqNum, data=Data}, Rest}.
 
-
 response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<0:8, Rest/binary>>}=_Packet, Buff) ->
-    %-% io:format("~nresponse (OK): ~p~n", [_Packet]),
-    {AffectedRows, Rest1} = length_coded_binary(Rest),
-    {InsertId, Rest2} = length_coded_binary(Rest1),
+    {AffectedRows, Rest1} = lcb(Rest),
+    {InsertId, Rest2} = lcb(Rest1),
     <<ServerStatus:16/little, WarningCount:16/little, Msg/binary>> = Rest2, % (*)!
-    %-% io:format("- warnings: ~p~n", [WarningCount]),
-    %-% io:format("- server status: ~p~n", [emysql_conn:hstate(ServerStatus)]),
     { #ok_packet{
         seq_num = SeqNum,
         affected_rows = AffectedRows,
@@ -89,16 +81,12 @@ response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<0:8, Rest/binary>>}
 
 % EOF: MySQL format <= 4.0, single byte. See -2-
 response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<?RESP_EOF:8>>}=_Packet, Buff) ->
-    %-% io:format("~nresponse (EOF v 4.0): ~p~n", [_Packet]),
     { #eof_packet{
         seq_num = SeqNum },
       ?SERVER_NO_STATUS, Buff };
 
 % EOF: MySQL format >= 4.1, with warnings and status. See -2-
-response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<?RESP_EOF:8, WarningCount:16/little, ServerStatus:16/little>>}=_Packet, Buff) -> % (*)!
-    %-% io:format("~nresponse (EOF v 4.1), Warn Count: ~p, Status ~p, Raw: ~p~n", [WarningCount, ServerStatus, _Packet]),
-    %-% io:format("- warnings: ~p~n", [WarningCount]),
-    %-% io:format("- server status: ~p~n", [emysql_conn:hstate(ServerStatus)]),
+response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<?RESP_EOF:8, WarningCount:16/little, ServerStatus:16/little>>}=_Packet, Buff) ->
     { #eof_packet{
         seq_num = SeqNum,
         status = ServerStatus,
@@ -107,7 +95,6 @@ response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<?RESP_EOF:8, Warnin
 
 % ERROR response: MySQL format >= 4.1. See -3-
 response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:16/little, "#", SQLState:5/binary-unit:8, Msg/binary>>}=_Packet, Buff) ->
-    %-% io:format("~nresponse (Response is ERROR): SeqNum: ~p, Packet: ~p~n", [SeqNum, _Packet]),
     { #error_packet{
         seq_num = SeqNum,
         code = ErrNo,
@@ -117,7 +104,6 @@ response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:16/lit
 
 % ERROR response: MySQL format <= 4.0. See -3-
 response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:16/little, Msg/binary>>}=_Packet, Buff) ->
-    %-% io:format("~nresponse (Response is ERROR): SeqNum: ~p, Packet: ~p~n", [SeqNum, _Packet]),
     { #error_packet{
         seq_num = SeqNum,
         code = ErrNo,
@@ -127,9 +113,8 @@ response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:16/lit
 
 % DATA response.
 response(Sock, DefaultTimeout, #packet{seq_num = SeqNum, data = Data}=_Packet, Buff) ->
-    %-% io:format("~nresponse (DATA): ~p~n", [_Packet]),
-    {FieldCount, Rest1} = length_coded_binary(Data),
-    {Extra, _} = length_coded_binary(Rest1),
+    {FieldCount, Rest1} = lcb(Data),
+    {Extra, _} = lcb(Rest1),
     {SeqNum1, FieldList, Buff2} = recv_field_list(Sock, SeqNum+1, DefaultTimeout, Buff),
     if
         length(FieldList) =/= FieldCount ->
@@ -158,20 +143,6 @@ recv_packet_header(_Sock, _Timeout, Buff) ->
         exit({bad_packet_header_data, Buff}).
     
 
-% This was used to approach a solution for proper handling of SERVER_MORE_RESULTS_EXIST
-%
-% recv_packet_header_if_present(Sock) ->
-%   case gen_tcp:recv(Sock, 4, 0) of
-%       {ok, <<PacketLength:24/little-integer, SeqNum:8/integer>>} ->
-%           {PacketLength, SeqNum};
-%       {ok, Bin} when is_binary(Bin) ->
-%           exit({bad_packet_header_data, Bin});
-%       {error, timeout} ->
-%           none;
-%       {error, Reason} ->
-%           exit({failed_to_recv_packet_header, Reason})
-%   end.
-
 recv_packet_body(Sock, PacketLength, Timeout, Buff) ->
     case Buff of
         <<Bin:PacketLength/binary, Rest/binary>> ->
@@ -190,22 +161,20 @@ recv_field_list(Sock, SeqNum, DefaultTimeout, Buff) ->
 
 recv_field_list(Sock, _SeqNum, DefaultTimeout, Acc, Buff) ->
 	case recv_packet(Sock, DefaultTimeout, Buff) of
-        {#packet{seq_num = SeqNum1, data = <<?RESP_EOF, _WarningCount:16/little, _ServerStatus:16/little>>}, Unparsed} -> % (*)!
-			%-% io:format("- eof: ~p~n", [emysql_conn:hstate(_ServerStatus)]),
+        {#packet{seq_num = SeqNum1, data = <<?RESP_EOF, _WarningCount:16/little, _ServerStatus:16/little>>}, Unparsed} ->
                         {SeqNum1, lists:reverse(Acc), Unparsed};
         {#packet{seq_num = SeqNum1, data = <<?RESP_EOF, _/binary>>}, Unparsed} ->
-			%-% io:format("- eof~n", []),
                         {SeqNum1, lists:reverse(Acc), Unparsed};
         {#packet{seq_num = SeqNum1, data = Data}, Unparsed} ->
-			{Catalog, Rest2} = length_coded_string(Data),
-			{Db, Rest3} = length_coded_string(Rest2),
-			{Table, Rest4} = length_coded_string(Rest3),
-			{OrgTable, Rest5} = length_coded_string(Rest4),
-			{Name, Rest6} = length_coded_string(Rest5),
-			{OrgName, Rest7} = length_coded_string(Rest6),
+			{Catalog, Rest2} = lcs(Data),
+			{Db, Rest3} = lcs(Rest2),
+			{Table, Rest4} = lcs(Rest3),
+			{OrgTable, Rest5} = lcs(Rest4),
+			{Name, Rest6} = lcs(Rest5),
+			{OrgName, Rest7} = lcs(Rest6),
 			<<_:1/binary, CharSetNr:16/little, Length:32/little, Rest8/binary>> = Rest7,
 			<<Type:8/little, Flags:16/little, Decimals:8/little, _:2/binary, Rest9/binary>> = Rest8,
-			{Default, _} = length_coded_binary(Rest9),
+			{Default, _} = lcb(Rest9),
 			Field = #field{
 				seq_num = SeqNum1,
 				catalog = Catalog,
@@ -220,7 +189,7 @@ recv_field_list(Sock, _SeqNum, DefaultTimeout, Acc, Buff) ->
 				length = Length,
 				flags = Flags,
 				decimals = Decimals,
-                decoder = cast_fun_for(Type)
+ 				decoder = cast_fun_for(Type)
 			},
 			recv_field_list(Sock, SeqNum1, DefaultTimeout, [Field|Acc], Unparsed)
 	end.
@@ -364,34 +333,16 @@ to_bit(<<0>>) -> 0.
 type_cast_row_data(undefined, _) -> undefined;
 type_cast_row_data(Data, #field{decoder = F}) -> F(Data).
 
-length_coded_binary(<<>>) -> {<<>>, <<>>};
-length_coded_binary(<<FirstByte:8, Tail/binary>>) ->
-    if
-        FirstByte =< 250 -> {FirstByte, Tail};
-        FirstByte == 251 -> {undefined, Tail};
-        FirstByte == 252 ->
-            <<Word:16/little, Tail1/binary>> = Tail,
-            {Word, Tail1};
-        FirstByte == 253 ->
-            <<Word:24/little, Tail1/binary>> = Tail,
-            {Word, Tail1};
-        FirstByte == 254 ->
-            <<Word:64/little, Tail1/binary>> = Tail,
-            {Word, Tail1};
-        true ->
-            exit(poorly_formatted_length_encoded_binary)
-    end.
+%% lcb/1 decodes length-coded-integer values
+lcb(<<>>) -> {<<>>, <<>>}; % This clause should be removed when we have control
+lcb(<< Value:8, Rest/bits >>) when Value =< 250 -> {Value, Rest};
+lcb(<< 252:8, Value:16/little, Rest/bits >>) -> {Value, Rest};
+lcb(<< 253:8, Value:24/little, Rest/bits >>) -> {Value, Rest};
+lcb(<< 254:8, Value:64/little, Rest/bits >>) -> {Value, Rest}.
 
-length_coded_string(<<>>) -> {<<>>, <<>>};
-length_coded_string(Bin) ->
-    case length_coded_binary(Bin) of
-        {undefined, Rest} ->
-            {undefined, Rest};
-        {Length, Rest} ->
-            case Rest of
-                <<String:Length/binary, Rest1/binary>> ->
-                    {String, Rest1};
-                _ ->
-                    exit(poorly_formatted_length_coded_string)
-            end
-    end.
+%% lcs/1 decodes length-encoded-string values
+lcs(<< 251:8, Rest/bits >>) -> {undefined, Rest};
+lcs(Bin) ->
+    {Length, Rest} = lcb(Bin),
+    << String:Length/binary, Excess/binary>> = Rest,
+    {String, Excess}.
