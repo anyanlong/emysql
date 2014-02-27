@@ -2,13 +2,21 @@
 
 [![Build Status](https://travis-ci.org/Eonblast/Emysql.png?branch=master)](https://travis-ci.org/Eonblast/Emysql)
 
+To use this driver, see the [Samples] further down in this README document.
+
+<hr/>
+
 Emysql implements a stable driver toward the MySQL database. It currently support fairly recent versions (somewhere around 5.3+) and it is considered fairly stable in production.
 
 The driver has several technical shortcomings:
 
 * No clear protocol / connection pool separation
+* No clear protocol / socket separation
 * A very complicated connection pool management
-* Uses the textual protocol in a lot of places where it should use a more binary protocol
+* Uses the textual protocol in a lot of places where it shouldthe  binary protocol
+* The API could be better
+
+*However,* this is probably the best MySQL driver out there for Erlang. The `erlang-mysql-driver` uses a problematic connection pool design for many use cases and is not suitable for general purpose use. This driver is.
 
 # Versioning
 
@@ -19,6 +27,17 @@ Semantic versioning is used. Versions are given as `x.y.z`:
 * `z` changes recognizes a new version, but is not supposed to break anything
 
 # Changelog of recent changes
+
+## Emysql 0.4.1
+
+Spring cleaning in the repository:
+
+* Removed a lot of modules which is not part of the official API from the documentation.
+* Deprecated the use of `emysql_util` for `emysql`.
+* Made tests actually do something with the `emysql_util` calls.
+* Moved function calls from `emysql_util` into the modules where they belong.
+
+Change should be backwards compatible.
 
 ## Emysql 0.4.0
 
@@ -36,8 +55,6 @@ Introduced changes by Garrett Smith:
 
 ## Emysql 0.3.0
 
-<hr/>
-
 *Note:* Automatic conversion to the encoding of the underlying MySQL
 server was removed in the 0.3.x branch. If you specify, e.g., utf-8
 encoding, then the MySQL server will reject wrongly-encoded strings
@@ -48,7 +65,7 @@ It is now the driver *callers* responsibility to ensure that data is
 properly encoded. This change makes it possible to pass binary BLOB
 data to the MySQL server once again.
 
-<hr/>
+# Overview:
 
 This is an Erlang MySQL driver, based on a rewrite at Electronic Arts. [Easy][Samples] to use, strong [connection pooling][Adding_a_Pool], [prepared statements][Executing_Prepared_Statements] & [stored procedures][Executing_Stored_Procedures]. Optimized for a central node architecture and OLTP.
 
@@ -95,12 +112,10 @@ In most cases, especially for high performance and stability, this package, [Emy
 If you are looking for the **plain necessities**, you should use the [ejabberd][7] mysql driver. It is simple, battle tested and stable. There are comprehensive instructions in the source comments.
 
 #### Transaction
+
+This driver currently does not support transactions.
+
 For **mnesia-style transactions**, one of the multiple '[erlang-mysql-driver][22]s' may suite you best. There are [quite many][16] branches of it out there, and they are based on the same project as the ejabberd driver. To learn more about out the differences between the drivers, see the [mysql driver history][History].
-
-## Getting Emysql
-
-	$ git clone git://github.com/Eonblast/Emysql.git Emysql
-
 
 ## Samples                                             <a name=Samples></a>
 
@@ -158,7 +173,7 @@ For the exact spec, see below, [Usage][]. Regarding the 'pool', also see below.
 	-record(foo, {bar, baz}).
 
 	Result = emysql:execute(pool1, <<"select bar, baz from foo">>).
-	Recs = emysql_util:as_record(Result, foo, record_info(fields, foo)).
+	Recs = emysql:as_record(Result, foo, record_info(fields, foo)).
 	Bars = [Foo#foo.bar || Foo <- Recs].
 
 ### Adding a Connection to the Connection Pool
@@ -237,6 +252,7 @@ To run the samples, create the database as listed above at localhost, and simply
 	$ ./d_prepared_statement
 	$ ./e_stored_procedure
 	$ ./f_load_from_file
+	$ ./g_rows_as_json
 	
 or (after building emysql.app and the database, as explained above), start a_hello etc. manually along these lines:
 
@@ -253,7 +269,7 @@ General Notes on using Emysql, including the actual specs:
 
 The Emysql driver is an Erlang gen-server, and, application.
 
-	crypto:start(),
+	crypto:start(), % Only needed for testing. In a proper release, this would happen automatically
 	application:start(emysql).
 
 #### Adding a Pool                                  <a name="Adding_a_Pool"></a>
