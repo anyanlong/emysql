@@ -1,7 +1,7 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
 <title>Module emysql</title>
 <link rel="stylesheet" type="text/css" href="emysql-style.css" title="EDoc">
 </head>
@@ -81,15 +81,25 @@ asynchronously handle the execution.</p>
 <table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#add_pool-2">add_pool/2</a></td><td>Synchronous call to the connection manager to add a pool.</td></tr>
 <tr><td valign="top"><a href="#add_pool-8">add_pool/8</a></td><td>Adds a pool using the default start commands (empty list).</td></tr>
 <tr><td valign="top"><a href="#add_pool-9">add_pool/9</a></td><td>Synchronous call to the connection manager to add a pool.</td></tr>
+<tr><td valign="top"><a href="#affected_rows-1">affected_rows/1</a></td><td>affected_rows/1 extracts the number of affected rows from an OK Packet.</td></tr>
+<tr><td valign="top"><a href="#as_dict-1">as_dict/1</a></td><td>package row data as a dict.</td></tr>
+<tr><td valign="top"><a href="#as_json-1">as_json/1</a></td><td>package row data as erlang json (jsx/jiffy compatible).</td></tr>
+<tr><td valign="top"><a href="#as_proplist-1">as_proplist/1</a></td><td>package row data as a proplist.</td></tr>
+<tr><td valign="top"><a href="#as_record-3">as_record/3</a></td><td>Equivalent to <a href="#as_record-4"><tt>as_record(Res, Recname, Fields, fun (A) -&gt; A end)</tt></a>.
+</td></tr>
+<tr><td valign="top"><a href="#as_record-4">as_record/4</a></td><td>package row data as records.</td></tr>
 <tr><td valign="top"><a href="#decrement_pool_size-2">decrement_pool_size/2</a></td><td>Synchronous call to the connection manager to shrink a pool.</td></tr>
 <tr><td valign="top"><a href="#default_timeout-0">default_timeout/0</a></td><td>Returns the default timeout in milliseconds.</td></tr>
 <tr><td valign="top"><a href="#execute-2">execute/2</a></td><td>Execute a query, prepared statement or a stored procedure.</td></tr>
 <tr><td valign="top"><a href="#execute-3">execute/3</a></td><td>Execute a query, prepared statement or a stored procedure.</td></tr>
 <tr><td valign="top"><a href="#execute-4">execute/4</a></td><td>Execute a query, prepared statement or a stored procedure.</td></tr>
 <tr><td valign="top"><a href="#execute-5">execute/5</a></td><td>Execute a query, prepared statement or a stored procedure - but return immediately, returning the atom 'unavailable', when no connection in the pool is readily available without wait.</td></tr>
+<tr><td valign="top"><a href="#field_names-1">field_names/1</a></td><td>Return the field names of a result packet.</td></tr>
 <tr><td valign="top"><a href="#increment_pool_size-2">increment_pool_size/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#insert_id-1">insert_id/1</a></td><td>insert_id/1 extracts the Insert ID from an OK Packet.</td></tr>
 <tr><td valign="top"><a href="#prepare-2">prepare/2</a></td><td>Prepare a statement.</td></tr>
 <tr><td valign="top"><a href="#remove_pool-1">remove_pool/1</a></td><td>Synchronous call to the connection manager to remove a pool.</td></tr>
+<tr><td valign="top"><a href="#result_type-1">result_type/1</a></td><td>result_type/1 decodes a packet into its type.</td></tr>
 <tr><td valign="top"><a href="#start-0">start/0</a></td><td>Start the Emysql application.</td></tr>
 <tr><td valign="top"><a href="#stop-0">stop/0</a></td><td>Stop the Emysql application.</td></tr>
 </table>
@@ -137,6 +147,61 @@ connect_timeout - millisecond timeout for connect or infinity (default)</p>
   Creates a pool record, opens n=Size connections and calls
   emysql_conn_mgr:add_pool() to make the pool known to the pool management.
   emysql_conn_mgr:add_pool() is translated into a blocking gen-server call.</p>
+
+<h3 class="function"><a name="affected_rows-1">affected_rows/1</a></h3>
+<div class="spec">
+<p><tt>affected_rows(Ok_packet::#ok_packet{}) -&gt; integer()</tt><br></p>
+</div><p>affected_rows/1 extracts the number of affected rows from an OK Packet</p>
+
+<h3 class="function"><a name="as_dict-1">as_dict/1</a></h3>
+<div class="spec">
+<p><tt>as_dict(Result) -&gt; Dict</tt>
+<ul class="definitions"><li><tt>Result = #result_packet{}</tt></li><li><tt>Dict = dict()</tt></li></ul></p>
+</div><p><p>package row data as a dict</p>
+ 
+  <p>-module(fetch_example).</p>
+ 
+  fetch_foo() -&gt;
+   Res = emysql:execute(pool1, "select * from foo"),
+   Res:as_dict(Res).</p>
+
+<h3 class="function"><a name="as_json-1">as_json/1</a></h3>
+<div class="spec">
+<p><tt>as_json(Res) -&gt; any()</tt></p>
+</div><p>package row data as erlang json (jsx/jiffy compatible)</p>
+
+<h3 class="function"><a name="as_proplist-1">as_proplist/1</a></h3>
+<div class="spec">
+<p><tt>as_proplist(Res::Result) -&gt; proplist</tt>
+<ul class="definitions"><li><tt>Result = #result_packet{}</tt></li></ul></p>
+</div><p><p>package row data as a proplist</p>
+ 
+  <p>-module(fetch_example).</p>
+ 
+  fetch_foo() -&gt;
+   Res = emysql:execute(pool1, "select * from foo"),
+   Res:as_proplist(Res).</p>
+
+<h3 class="function"><a name="as_record-3">as_record/3</a></h3>
+<div class="spec">
+<p><tt>as_record(Res, Recname, Fields) -&gt; any()</tt></p>
+</div><p>Equivalent to <a href="#as_record-4"><tt>as_record(Res, Recname, Fields, fun (A) -&gt; A end)</tt></a>.</p>
+
+
+<h3 class="function"><a name="as_record-4">as_record/4</a></h3>
+<div class="spec">
+<p><tt>as_record(Res::Result, Recname::RecordName, Fields, Fun) -&gt; Result</tt>
+<ul class="definitions"><li><tt>Result = #result_packet{}</tt></li><li><tt>RecordName = atom()</tt></li><li><tt>Fields = [atom()]</tt></li><li><tt>Fun = function()</tt></li><li><tt>Result = [Row]</tt></li><li><tt>Row = [<a href="#type-record">record()</a>]</tt></li></ul></p>
+</div><p><p>package row data as records</p>
+ 
+  <p>RecordName is the name of the record to generate.  
+Fields are the field names to generate for each record.</p>
+ 
+  <p>-module(fetch_example).</p>
+ 
+  fetch_foo() -&gt;
+   Res = emysql:execute(pool1, "select * from foo"),
+   Res:as_record(foo, record_info(fields, foo)).</p>
 
 <h3 class="function"><a name="decrement_pool_size-2">decrement_pool_size/2</a></h3>
 <div class="spec">
@@ -245,10 +310,21 @@ Timeout is the query timeout in milliseconds or the atom infinity.</p>
  </p>
 <p><b>See also:</b> <a href="#execute-2">execute/2</a>, <a href="#execute-3">execute/3</a>, <a href="#execute-4">execute/4</a>, <a href="#prepare-2">prepare/2</a>.</p>
 
+<h3 class="function"><a name="field_names-1">field_names/1</a></h3>
+<div class="spec">
+<p><tt>field_names(Result) -&gt; [Name]</tt>
+<ul class="definitions"><li><tt>Result = #result_packet{}</tt></li><li><tt>Name = binary()</tt></li></ul></p>
+</div><p>Return the field names of a result packet</p>
+
 <h3 class="function"><a name="increment_pool_size-2">increment_pool_size/2</a></h3>
 <div class="spec">
 <p><tt>increment_pool_size(PoolId::atom(), Num::non_neg_integer()) -&gt; ok | {error, list()}</tt><br></p>
 </div>
+
+<h3 class="function"><a name="insert_id-1">insert_id/1</a></h3>
+<div class="spec">
+<p><tt>insert_id(Ok_packet::#ok_packet{}) -&gt; integer() | binary()</tt><br></p>
+</div><p>insert_id/1 extracts the Insert ID from an OK Packet</p>
 
 <h3 class="function"><a name="prepare-2">prepare/2</a></h3>
 <div class="spec">
@@ -333,6 +409,11 @@ Emysql.</p>
   Relies on emysql_conn:close_connection(Conn) for the proper closing of connections. Feeds
   any connection in the pool to it, also the locked ones.</p>
 
+<h3 class="function"><a name="result_type-1">result_type/1</a></h3>
+<div class="spec">
+<p><tt>result_type(Ok_packet) -&gt; any()</tt></p>
+</div><p>result_type/1 decodes a packet into its type</p>
+
 <h3 class="function"><a name="start-0">start/0</a></h3>
 <div class="spec">
 <p><tt>start() -&gt; ok</tt><br></p>
@@ -373,6 +454,6 @@ affected.</p>
 <hr>
 
 <div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
-<p><i>Generated by EDoc, Feb 26 2014, 21:52:57.</i></p>
+<p><i>Generated by EDoc, Feb 27 2014, 12:00:46.</i></p>
 </body>
 </html>

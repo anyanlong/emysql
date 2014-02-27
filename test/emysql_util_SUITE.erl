@@ -63,33 +63,45 @@ end_per_suite(_) ->
 %% Test Cases: Test if emysql_util:as_dict/1 works
 %%--------------------------------------------------------------------
 dict_empty_test(_) ->
-    dict:from_list([]) =:= emysql_util:as_dict(get_empty_test()).
+    E = dict:from_list([]),
+    E = emysql_util:as_dict(get_empty_test()),
+    E = emysql:as_dict(get_empty_test()),
+    ok.
 
 dict_single_test(_) ->
-    dict:from_list([{<<"HelloField">>,<<"Hello">>}]) =:= emysql_util:as_dict(get_single_test()).
+    E = dict:from_list([{<<"HelloField">>,<<"Hello">>}]),
+    E = emysql_util:as_dict(get_single_test()),
+    E = emysql:as_dict(get_single_test()),
+    ok.
 
 dict_multi_test(_) ->
-    dict:from_list([
+    E = dict:from_list([
             {<<"HelloField">>,<<"Hello">>},
             {<<"HiField">>,<<"Hi">>},
             {<<"ByeField">>,<<"Bye">>}
-           ])
-    =:= emysql_util:as_dict(get_multi_test()).
+    ]),
+    E = emysql_util:as_dict(get_multi_test()),
+    E = emysql:as_dict(get_multi_test()),
+    ok.
+
 %% Test Cases: Test if emysql_util:as_proplist/1 works
 %%--------------------------------------------------------------------
 proplist_empty_test(_) ->
-    [] =:= emysql_util:as_proplist(get_empty_test()).
+    [] = emysql_util:as_proplist(get_empty_test()),
+    [] = emysql:as_proplist(get_empty_test()),
+    ok.
 
 proplist_single_test(_) ->
-    [{<<"HelloField">>,<<"Hello">>}] =:=  emysql_util:as_proplist(get_single_test()).
+    Expect = [ [{<<"HelloField">>,<<"Hello">>}] ],
+    Expect = emysql_util:as_proplist(get_single_test()),
+    Expect = emysql:as_proplist(get_single_test()),
+    ok.
 
 proplist_multi_test(_) ->
-    [
-     {<<"HelloField">>,<<"Hello">>},
-     {<<"HiField">>,<<"Hi">>},
-     {<<"ByeField">>,<<"Bye">>}
-    ]
-    =:= emysql_util:as_proplist(get_multi_test()).
+    Expect = [ [{<<"HelloField">>,<<"Hello">>},{<<"HiField">>,<<"Hi">>},{<<"ByeField">>,<<"Bye">>}] ],
+    Expect = emysql_util:as_proplist(get_multi_test()),
+    Expect = emysql:as_proplist(get_multi_test()),
+    ok.
 
 %% Test Cases: Test if emysql_util:as_record/3 works
 %%--------------------------------------------------------------------
@@ -106,6 +118,7 @@ record_test(_Config) ->
     Result = emysql:execute(test_pool, <<"select * from as_record_test">>),
     Expected = [#person{ surname = <<"Komar">>, name = <<"Maxim">>, socks=3 }],
     Expected = emysql_util:as_record(Result, person, record_info(fields, person)),
+    Expected = emysql:as_record(Result, person, record_info(fields, person)),
     ok.
 %%--------------------------------------------------------------------
 

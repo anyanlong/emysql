@@ -95,15 +95,40 @@
 
 -module(emysql).
 
+
+%% Life cycle API
+%% These are used to handle the life-cycle of the code base
 -export([   start/0, stop/0,
             add_pool/2,
             add_pool/9,
-            add_pool/8, remove_pool/1, increment_pool_size/2, decrement_pool_size/2,
+            add_pool/8, remove_pool/1, increment_pool_size/2, decrement_pool_size/2
+]).
+        
+%% Interaction API
+%% Used to interact with the database.    
+-export([
             prepare/2,
             execute/2, execute/3, execute/4, execute/5,
             default_timeout/0,
             modules/0
-        ]).
+]).
+
+%% Result Conversion API
+-export([
+         as_dict/1,
+         as_json/1,
+         as_proplist/1,
+         as_record/3,
+         as_record/4
+]).
+
+%% Result Data API - Handle results from Mysql
+-export([
+	affected_rows/1,
+	result_type/1,
+         field_names/1,
+         insert_id/1
+]).
 
 -type state() :: any().
 
@@ -594,6 +619,90 @@ execute(PoolId, StmtName, Args, Timeout, nonblocking) when is_atom(StmtName), is
         unavailable ->
             unavailable
     end.
+
+%% @doc Return the field names of a result packet
+%% @end
+-spec field_names(Result) -> [Name]
+  when
+    Result :: #result_packet{},
+    Name :: binary().
+field_names(#result_packet{field_list=FieldList}) ->
+    [Field#field.name || Field <- FieldList].
+
+%% @doc insert_id/1 extracts the Insert ID from an OK Packet
+%% @end
+-spec insert_id(#ok_packet{}) -> integer() | binary().
+insert_id(#ok_packet{insert_id=ID}) ->
+    ID.
+
+%% @doc affected_rows/1 extracts the number of affected rows from an OK Packet
+%% @end
+-spec affected_rows(#ok_packet{}) -> integer().
+affected_rows(#ok_packet{affected_rows=Rows}) ->
+    Rows.
+
+%% @doc result_type/1 decodes a packet into its type
+%% @end
+result_type(#ok_packet{})     -> ok;
+result_type(#result_packet{}) -> result;
+result_type(#error_packet{})  -> error;
+result_type(#eof_packet{})    -> eof.
+
+%% @doc package row data as a dict
+%%
+%% -module(fetch_example).
+%%
+%% fetch_foo() ->
+%%  Res = emysql:execute(pool1, "select * from foo"),
+%%  Res:as_dict(Res).
+-spec as_dict(Result) -> Dict
+  when
+    Result :: #result_packet{},
+    Dict :: dict().
+as_dict(Res) -> emysql_conv:as_dict(Res).
+
+
+%% @doc package row data as erlang json (jsx/jiffy compatible)
+as_json(Res) -> emysql_conv:as_json(Res).
+
+%% @spec as_proplist(Result) -> proplist
+%%      Result = #result_packet{}
+%%
+%% @doc package row data as a proplist
+%%
+%% -module(fetch_example).
+%%
+%% fetch_foo() ->
+%%  Res = emysql:execute(pool1, "select * from foo"),
+%%  Res:as_proplist(Res).
+-spec as_proplist(Result) -> [PropRow]
+   when
+     Result :: #result_packet{},
+     PropRow :: proplists:proplist().
+as_proplist(Res) -> emysql_conv:as_proplist(Res).
+
+%% @equiv as_record(Res, Recname, Fields, fun(A) -> A end)
+as_record(Res, Recname, Fields) -> emysql_conv:as_record(Res, Recname, Fields).
+
+%% @spec as_record(Result, RecordName, Fields, Fun) -> Result
+%%      Result = #result_packet{}
+%%      RecordName = atom()
+%%      Fields = [atom()]
+%%      Fun = fun()
+%%      Result = [Row]
+%%      Row = [record()]
+%%
+%% @doc package row data as records
+%%
+%% RecordName is the name of the record to generate.
+%% Fields are the field names to generate for each record.
+%%
+%% -module(fetch_example).
+%%
+%% fetch_foo() ->
+%%  Res = emysql:execute(pool1, "select * from foo"),
+%%  Res:as_record(foo, record_info(fields, foo)).
+as_record(Res, Recname, Fields, Fun) -> emysql_conv:as_record(Res, Recname, Fields, Fun).
 
 %%--------------------------------------------------------------------
 %%% Internal functions
