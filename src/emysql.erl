@@ -223,16 +223,35 @@ default_timeout() ->
 %%
 %% Refer to add_pool/8 for implementation details.
 
-add_pool(PoolId, Options) ->
-    Size = proplists:get_value(size, Options, 1),
+-record(pool_settings,{size,user,password,host,port,database,encoding,start_cmds,connect_timeout}).
+
+add_pool(PoolId, Options) when is_list(Options) ->
+    Size = proplists:get_value(size, Options, 5),
     User = proplists:get_value(user, Options, ""),
     Password = proplists:get_value(password, Options, ""),
     Host = proplists:get_value(host, Options, "127.0.0.1"),
     Port = proplists:get_value(port, Options, 3306),
     Database = proplists:get_value(database, Options, undefined),
-    Encoding = proplists:get_value(encoding, Options, utf8),
+    Encoding = proplists:get_value(encoding, Options, latin1),
     StartCmds = proplists:get_value(start_cmds, Options, []),
     ConnectTimeout = proplists:get_value(connect_timeout, Options, infinity),
+    add_pool(PoolId,#pool_settings{size=Size, user=User, password=Password,
+			  host=Host, port=Port, database=Database,
+			  encoding=Encoding, start_cmds=StartCmds, 
+			  connect_timeout=ConnectTimeout});
+add_pool(PoolId, #pool_settings{size=Size,user=User,password=Password,host=Host,port=Port,
+		       database=Database,encoding=Encoding,start_cmds=StartCmds,
+		       connect_timeout=ConnectTimeout})
+  when is_atom(PoolId),
+       is_integer(Size),
+       is_list(User),
+       is_list(Password),
+       is_list(Host),
+       is_integer(Port),
+       is_list(Database) orelse Database == undefined,
+       is_atom(Encoding),
+       is_list(StartCmds),
+       is_integer(ConnectTimeout) orelse ConnectTimeout == infinity ->
     case emysql_conn_mgr:has_pool(PoolId) of
         true -> 
             {error,pool_already_exists};

@@ -38,12 +38,18 @@
         select_a_record/1,
 
         add_pool_utf8/1,
+        add_pool_utf8_deprecated/1,
         add_pool_latin1/1,
+        add_pool_latin1_deprecated/1,
         add_pool_latin1_compatible/1,
+        add_pool_latin1_compatible_deprecated/1,
         add_pool_time_zone/1,
+        add_pool_time_zone_deprecated/1,
         add_pool_wrong_db/1,
         add_pool_wrong_cmd/1,
-
+        add_pool_port_should_be_a_number/1,
+        add_pool_size_should_be_a_number/1,
+        add_pool_timeout_should_be_a_number/1,
         add_pool_env_defaults/1,
         add_pool_env_all/1
 
@@ -60,12 +66,18 @@ all() ->
         select_a_record,
 
         add_pool_utf8,
+        add_pool_utf8_deprecated,
         add_pool_latin1,
+        add_pool_latin1_deprecated,
         add_pool_latin1_compatible,
+        add_pool_latin1_compatible_deprecated,
         add_pool_time_zone,
+        add_pool_time_zone_deprecated,
         add_pool_wrong_db,
         add_pool_wrong_cmd,
-
+        add_pool_port_should_be_a_number,
+        add_pool_size_should_be_a_number,
+        add_pool_timeout_should_be_a_number,
         add_pool_env_defaults,
         add_pool_env_all
     ].
@@ -98,6 +110,8 @@ init_per_testcase(add_pool_env_all, Config) ->
     ok = application:start(emysql),
     Config;
 
+%TODO: Probably better to split out test suite into ones that expect the pool to exist and 
+% tests that are about setting up the pool.
 init_per_testcase(T, Config) when
         T == connecting_to_db_and_creating_a_pool_transition orelse
         T == insert_a_record orelse
@@ -114,8 +128,12 @@ end_per_testcase(T, _) when
         T == insert_a_record orelse
         T == select_a_record orelse
         T == add_pool_utf8 orelse
+        T == add_pool_utf8_deprecated orelse
         T == add_pool_latin1 orelse
+        T == add_pool_latin1_deprecated orelse
         T == add_pool_latin1_compatible orelse
+        T == add_pool_latin1_compatible_deprecated orelse
+        T == add_pool_time_zone_deprecated orelse
         T == add_pool_time_zone ->
 	emysql:remove_pool(?POOL);
 
@@ -161,29 +179,65 @@ select_a_record(_) ->
     #result_packet{rows=[[<<"Hello World!">>]]} =
     emysql:execute(?POOL, <<"select hello_text from hello_table">>).
 
+
 add_pool_utf8(_) ->
+    %emysql:add_pool(?POOL, 10, test_helper:test_u(), test_helper:test_p(),
+    %    "localhost", 3306, undefined, utf8),
+    emysql:add_pool(?POOL, [{user,test_helper:test_u()}, 
+			    {password,test_helper:test_p()},
+			    {encoding, utf8}]),
+    #result_packet{rows=[[<<"utf8">>]]} =
+    emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
+
+% Note on deprecated tests: keeping while the add_pool/>2 are still part of the api.
+add_pool_utf8_deprecated(_) ->
     emysql:add_pool(?POOL, 10, test_helper:test_u(), test_helper:test_p(),
         "localhost", 3306, undefined, utf8),
     #result_packet{rows=[[<<"utf8">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 
 add_pool_latin1(_) ->
+    emysql:add_pool(?POOL, [{user,test_helper:test_u()}, 
+			    {password,test_helper:test_p()},
+			    {encoding, latin1}]),
+    #result_packet{rows=[[<<"latin1">>]]} =
+    emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
+
+add_pool_latin1_deprecated(_) ->
     emysql:add_pool(?POOL, 10, test_helper:test_u(), test_helper:test_p(),
         "localhost", 3306, undefined, latin1),
     #result_packet{rows=[[<<"latin1">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 
+% TODO: Not sure you really want latin1 to be the default encoding.
 add_pool_latin1_compatible(_) ->
+    emysql:add_pool(?POOL, [{user,test_helper:test_u()}, 
+			    {password,test_helper:test_p()}]),
+    %emysql:add_pool(?POOL, 10, test_helper:test_u(), test_helper:test_p(),
+    %    "localhost", 3306, undefined, undefined),
+    #result_packet{rows=[[<<"latin1">>]]} =
+    emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
+
+add_pool_latin1_compatible_deprecated(_) ->
     emysql:add_pool(?POOL, 10, test_helper:test_u(), test_helper:test_p(),
         "localhost", 3306, undefined, undefined),
     #result_packet{rows=[[<<"latin1">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 
+
 add_pool_time_zone(_) ->
+    emysql:add_pool(?POOL, [{user,test_helper:test_u()}, 
+			    {password,test_helper:test_p()},
+			    {start_cmds,[<<"SET time_zone='+00:00'">>]}]),
+    #result_packet{rows=[[<<"+00:00">>]]} =
+    emysql:execute(?POOL, <<"SELECT @@time_zone;">>).
+
+add_pool_time_zone_deprecated(_) ->
     emysql:add_pool(?POOL, 10, test_helper:test_u(), test_helper:test_p(),
         "localhost", 3306, undefined, utf8, [<<"SET time_zone='+00:00'">>]),
     #result_packet{rows=[[<<"+00:00">>]]} =
     emysql:execute(?POOL, <<"SELECT @@time_zone;">>).
+
 
 add_pool_env_defaults(_) ->
     #result_packet{rows=[[undefined]]} =
@@ -221,14 +275,72 @@ add_pool_wrong_db(_) ->
 
 add_pool_wrong_cmd(_) ->
     {Pid, Mref} = spawn_monitor(fun() ->
-                emysql:add_pool(?POOL, 10, test_helper:test_u(),
-                    test_helper:test_p(), "localhost", 3306, undefined, utf8,
-                    [<<"syntax error">>])
+                emysql:add_pool(?POOL, [{user,test_helper:test_u()},
+					{password,test_helper:test_p()},
+					{start_cmds,[<<"syntax error">>]}])
         end
     ),
     receive
         {'DOWN', Mref, process, Pid, {{nocatch, {failed_to_run_cmd, _}}, _}} ->
             ok
+    after 100 ->
+            exit(should_have_failed)
+    end,
+    % Verify there are no connections added for real
+    [] = emysql_conn_mgr:pools().
+
+add_pool_port_should_be_a_number(_) ->
+    {Pid, Mref} = spawn_monitor(fun() ->
+                emysql:add_pool(?POOL, [{user,test_helper:test_u()},
+					{password,test_helper:test_p()},
+					{port,"NotANumber"}])
+        end
+    ),
+    receive
+        {'DOWN', Mref, process, Pid, _} ->
+            ok;
+	_Other ->
+	    exit({unexpected,_Other})
+
+    after 100 ->
+            exit(should_have_failed)
+    end,
+    % Verify there are no connections added for real
+    [] = emysql_conn_mgr:pools().
+
+add_pool_size_should_be_a_number(_) ->
+    {Pid, Mref} = spawn_monitor(fun() ->
+                emysql:add_pool(?POOL, [{size,"Ten"}, 
+					{user,test_helper:test_u()},
+					{password,test_helper:test_p()}])
+					
+        end
+    ),
+    receive
+        {'DOWN', Mref, process, Pid, _} ->
+            ok;
+	_Other ->
+	    exit({unexpected,_Other})
+
+    after 100 ->
+            exit(should_have_failed)
+    end,
+    % Verify there are no connections added for real
+    [] = emysql_conn_mgr:pools().
+
+add_pool_timeout_should_be_a_number(_) ->
+    {Pid, Mref} = spawn_monitor(fun() ->
+                Results = emysql:add_pool([{user,test_helper:test_u()},
+					   {password,test_helper:test_p()},
+					   {connect_timeout,"TimeoutNotANumber"}])
+        end
+    ),
+    receive
+        {'DOWN', Mref, process, Pid, _} ->
+            ok;
+	_Other ->
+	    exit({unexpected,_Other})
+
     after 100 ->
             exit(should_have_failed)
     end,
