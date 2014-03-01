@@ -223,17 +223,57 @@ default_timeout() ->
 %%
 %% Refer to add_pool/8 for implementation details.
 
-add_pool(PoolId, Options) ->
-    Size = proplists:get_value(size, Options, 1),
+-record(pool_settings,{size,user,password,host,port,database,encoding,start_cmds,connect_timeout}).
+
+add_pool(PoolId, Options) when is_list(Options) ->
+    Size = proplists:get_value(size, Options, 5),
     User = proplists:get_value(user, Options, ""),
     Password = proplists:get_value(password, Options, ""),
     Host = proplists:get_value(host, Options, "127.0.0.1"),
     Port = proplists:get_value(port, Options, 3306),
     Database = proplists:get_value(database, Options, undefined),
-    Encoding = proplists:get_value(encoding, Options, utf8),
+    Encoding = proplists:get_value(encoding, Options, latin1),
     StartCmds = proplists:get_value(start_cmds, Options, []),
     ConnectTimeout = proplists:get_value(connect_timeout, Options, infinity),
-    add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds, ConnectTimeout).
+    add_pool(PoolId,#pool_settings{size=Size, user=User, password=Password,
+			  host=Host, port=Port, database=Database,
+			  encoding=Encoding, start_cmds=StartCmds, 
+			  connect_timeout=ConnectTimeout});
+add_pool(PoolId, #pool_settings{size=Size,user=User,password=Password,host=Host,port=Port,
+		       database=Database,encoding=Encoding,start_cmds=StartCmds,
+		       connect_timeout=ConnectTimeout})
+  when is_atom(PoolId),
+       is_integer(Size),
+       is_list(User),
+       is_list(Password),
+       is_list(Host),
+       is_integer(Port),
+       is_list(Database) orelse Database == undefined,
+       is_atom(Encoding),
+       is_list(StartCmds),
+       is_integer(ConnectTimeout) orelse ConnectTimeout == infinity ->
+    case emysql_conn_mgr:has_pool(PoolId) of
+        true -> 
+            {error,pool_already_exists};
+        false ->
+            Pool = #pool{
+                    pool_id = PoolId,
+                    size = Size,
+                    user = User,
+                    password = Password,
+                    host = Host,
+                    port = Port,
+                    database = Database,
+                    encoding = Encoding,
+                    start_cmds = StartCmds,
+                    connect_timeout = ConnectTimeout
+                    },
+            Pool2 = case emysql_conn:open_connections(Pool) of
+                {ok, Pool1} -> Pool1;
+                {error, Reason} -> throw(Reason)
+            end,
+            emysql_conn_mgr:add_pool(Pool2)
+    end.
 
 %% @spec add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding) -> Result
 %%
@@ -268,39 +308,21 @@ add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding) ->
 add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds) ->
     add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds, infinity).
 
-add_pool(PoolId, Size, User, Passwd, Host, Port, DB, Encoding, StartCmds, ConnectTimeout)
+add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds, ConnectTimeout)
   when is_atom(PoolId),
        is_integer(Size),
        is_list(User),
-       is_list(Passwd),
+       is_list(Password),
        is_list(Host),
        is_integer(Port),
-       is_list(DB) orelse DB == undefined,
+       is_list(Database) orelse Database == undefined,
        is_atom(Encoding),
        is_list(StartCmds),
        is_integer(ConnectTimeout) orelse ConnectTimeout == infinity ->
-    case emysql_conn_mgr:has_pool(PoolId) of
-        true -> 
-            {error,pool_already_exists};
-        false ->
-            Pool = #pool{
-                    pool_id = PoolId,
-                    size = Size,
-                    user = User,
-                    password = Passwd,
-                    host = Host,
-                    port = Port,
-                    database = DB,
-                    encoding = Encoding,
-                    start_cmds = StartCmds,
-                    connect_timeout = ConnectTimeout
-                    },
-            Pool2 = case emysql_conn:open_connections(Pool) of
-                {ok, Pool1} -> Pool1;
-                {error, Reason} -> throw(Reason)
-            end,
-            emysql_conn_mgr:add_pool(Pool2)
-    end.
+    add_pool(PoolId,[{size,Size},{user,User},{password,Password},
+		     {host,Host},{port,Port},{database,Database},
+		     {encoding,Encoding},{start_cmds,StartCmds},
+		     {connect_timeout,ConnectTimeout}]).
 
 %% @spec remove_pool(PoolId) -> ok
 %%      PoolId = atom()
