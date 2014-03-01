@@ -130,15 +130,17 @@ This is a hello world program. Follow the three steps below to try it out.
 	
 		crypto:start(),
 		application:start(emysql),
-	
-		emysql:add_pool(hello_pool, 1,
-			"hello_username", "hello_password", "localhost", 3306,
-			"hello_database", utf8),
-	
+	        
+                emysql:add_pool(hello_pool, [{size,1},
+                             {user,"hello_username"},
+                             {password,"hello_password"},
+                             {database,"hello_database"},
+                             {encoding,utf8}]),
+
 		emysql:execute(hello_pool,
 			<<"INSERT INTO hello_table SET hello_text = 'Hello World!'">>),
 	
-	    Result = emysql:execute(hello_pool,
+	        Result = emysql:execute(hello_pool,
 			<<"select hello_text from hello_table">>),
 	
 		io:format("~n~p~n", [Result]).
@@ -180,17 +182,18 @@ For the exact spec, see below, [Usage][]. Regarding the 'pool', also see below.
 
 Emysql uses a sophisticated connection pooling mechanism.
 
-	emysql:add_pool(my_pool, 1, "myuser", "mypass", "myhost", 3306,
-      "mydatabase", utf8).
+	emysql:add_pool(my_pool, [{size,1}, {user,"myuser"}, {password,"mypass"}, 
+	    {host,"myhost"}, {port,3306},{database,"mydatabase"}, {encoding,utf8}).
 
-Arbitrary post-connection start-up commands can be added as a list of binaries
-to the last `emysql:add_pool/9` argument:
+Arbitrary post-connection start-up commands can be added with the proplist key atom 
+```start_cmds```:
 
-	emysql:add_pool(my_pool, 1, "myuser", "mypass", "myhost", 3306,
-      "mydatabase", utf8, [
+	emysql:add_pool(my_pool, [{size,1}, {user,"myuser"}, {password,"mypass"}, 
+	    {host,"myhost"}, {port,3306},{database,"mydatabase"}, {encoding,utf8},
+	    {start_cmds,[
           <<"SET TIME_ZONE='+00:00'">>,
           <<"SET SQL_MODE='STRICT_ALL_TABLES'">>
-      ]).
+	]).
 
 ### Running Hello World
 
@@ -275,9 +278,9 @@ The Emysql driver is an Erlang gen-server, and, application.
 
 #### Adding a Pool                                  <a name="Adding_a_Pool"></a>
 
-To add a pool, you need to use one of the `emysql:add_pool/K` variants. I recommend using
-`emysql:add_pool/2` which takes a proplist of parameters and is a bit easier to work with
-rather than getting a parameter list correct. See the documentation for what options the
+To add a pool, use `emysql:add_pool/2` which takes a proplist of parameters.
+If you need to use one of the `emysql:add_pool/K` variants, please be aware that they are deprecated
+in favor of `add_pool/2` and will be removed in a future version. See the documentation for what options the
 add_pool call accepts.
 
 #### More Record Types
