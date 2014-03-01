@@ -72,9 +72,12 @@ run() ->
 	application:start(emysql),
 
 	io:format("~nConnect~n-------~n", []),
-	emysql:add_pool(hello_pool, 1,
-		"hello_username", "hello_password", "localhost", 3306,
-		"hello_database", utf8),
+
+	emysql:add_pool(hello_pool, [{size,1},
+				     {user,"hello_username"},
+				     {password,"hello_password"},
+				     {database,"hello_database"},
+				     {encoding,utf8}]),
 
 	io:format("~nCreate Record~n-------------~n", []),
 	emysql:execute(hello_pool,

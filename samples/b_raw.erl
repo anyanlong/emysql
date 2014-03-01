@@ -65,9 +65,11 @@ run() ->
 	crypto:start(),
 	application:start(emysql),
 
-	emysql:add_pool(hello_pool, 1,
-		"hello_username", "hello_password", "localhost", 3306,
-		"hello_database", utf8),
+	emysql:add_pool(hello_pool, [{size,1},
+				     {user,"hello_username"},
+				     {password,"hello_password"},
+				     {database,"hello_database"},
+				     {encoding,utf8}]),
 
 	emysql:execute(hello_pool,
 		<<"INSERT INTO hello_table SET hello_text = 'Hello World!'">>),
