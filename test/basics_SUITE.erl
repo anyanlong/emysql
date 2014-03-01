@@ -1,13 +1,13 @@
 %%%-------------------------------------------------------------------
 %%% File     : Emysql/test/basics_SUITE.erl
 %%% Descr    : Suite #2: Tests of basic SQL statements,
-%%%            prepared statements, stored procedures 
+%%%            prepared statements, stored procedures
 %%% Author   : H. Diedrich
 %%% Created  : 12/13/2011 hd
 %%% Requires : Erlang 14B (prior may not have ct_run)
 %%%-------------------------------------------------------------------
 %%%
-%%% Run from Emysql/: 
+%%% Run from Emysql/:
 %%%     make test
 %%%
 %%% Results see:
@@ -31,7 +31,7 @@
 suite() ->
     [{timetrap,{seconds,30}}].
 
-%% Mandatory list of test cases and test groups, and skip orders. 
+%% Mandatory list of test cases and test groups, and skip orders.
 %%--------------------------------------------------------------------
 %% Function: all() -> GroupsAndTestCases | {skip,Reason}
 %% GroupsAndTestCases = [{group,GroupName} | TestCase]
@@ -40,7 +40,7 @@ suite() ->
 %% Reason = term()
 %%--------------------------------------------------------------------
 
-all() -> 
+all() ->
     [delete_all,
      encode_atoms,
      insert_only,
@@ -62,6 +62,9 @@ groups() ->
          proplist_empty_test,
          proplist_single_test,
          proplist_multi_test,
+         json_empty_test,
+         json_single_test,
+         json_multi_test,
          record_test]}
     ].
 
@@ -107,7 +110,7 @@ end_per_suite(_Config) ->
 %% Test Case: Delete all records in the test database
 %%--------------------------------------------------------------------
 delete_all(_) ->
-	
+
     emysql:execute(test_pool, <<"DELETE FROM hello_table">>),
     ok.
 
@@ -115,7 +118,7 @@ delete_all(_) ->
 %% Test Case: Make an Insert
 %%--------------------------------------------------------------------
 insert_only(_) ->
-	
+
     emysql:execute(test_pool,
         <<"INSERT INTO hello_table SET hello_text = 'Hello World!'">>),
 
@@ -137,7 +140,7 @@ encode_atoms(_Config) ->
 %% Test Case: Make an Insert and Select it back
 %%--------------------------------------------------------------------
 insert_and_read_back(_) ->
-	
+
     emysql:execute(test_pool, <<"DELETE FROM hello_table">>),
 
     emysql:execute(test_pool,
@@ -145,14 +148,14 @@ insert_and_read_back(_) ->
 
     Result = emysql:execute(test_pool,
         <<"select hello_text from hello_table">>),
-	
+
 	% find this output by clicking on the test name, then case name in test/index.html
 	ct:log("~p~n", [Result]),
 
 	% the test
 	{result_packet,5,
-               [#field{seq_num=2, 
-                       catalog= <<"def">>, 
+               [#field{seq_num=2,
+                       catalog= <<"def">>,
                        db= <<"hello_database">>,
                        table= <<"hello_table">>,
                        org_table= <<"hello_table">>,
@@ -167,7 +170,7 @@ insert_and_read_back(_) ->
                        decoder = _ }],
                [[<<"Hello World!">>]],
                <<>>} = Result,
-    
+
     ok.
 
 %% Test Case: Encode floating point data into a test table (Issue 57)
@@ -175,7 +178,7 @@ encode_floating_point_data(_Config) ->
     emysql:execute(test_pool, <<"DROP TABLE float_test">>),
     emysql:execute(test_pool, <<"CREATE TABLE float_test ( x FLOAT )">>),
     emysql:prepare(encode_float_stmt, <<"INSERT INTO float_test (x) VALUES (?)">>),
-    
+
     Result = emysql:execute(test_pool, encode_float_stmt, [3.14]),
 
     ct:log("Result: ~p", [Result]),
@@ -185,7 +188,7 @@ encode_floating_point_data(_Config) ->
 %% Test Case: Make an Insert and Select it back, reading out as Record
 %%--------------------------------------------------------------------
 insert_and_read_back_as_recs(_) ->
-	
+
     emysql:execute(test_pool, <<"DELETE FROM hello_table">>),
 
 	emysql:execute(test_pool,
@@ -203,7 +206,7 @@ insert_and_read_back_as_recs(_) ->
 	Recs = [{hello_record,<<"Hello World!">>}],
 
 	ok.
-	
+
 %% Test Case: Make an Insert and Select it back, reading out as JSON
 %%--------------------------------------------------------------------
 insert_and_read_back_as_json(_) ->
@@ -234,7 +237,7 @@ select_by_prepared_statement(_) ->
 	emysql:execute(test_pool,
 		<<"INSERT INTO hello_table SET hello_text = 'Hello World!'">>),
 
-	emysql:prepare(test_stmt, 
+	emysql:prepare(test_stmt,
 		<<"SELECT * from hello_table WHERE hello_text like ?">>),
 
 	Result = emysql:execute(test_pool, test_stmt, ["Hello%"]),
@@ -243,7 +246,7 @@ select_by_prepared_statement(_) ->
 	ct:log("Result: ~p~n", [Result]),
 
 	% the test
-	{result_packet,5,  
+	{result_packet,5,
                     [#field{
                             seq_num=2,
                             catalog= <<"def">>,
@@ -276,7 +279,7 @@ multiple_select(_) ->
 	ct:log("Result2: ~p~n", [Result2]),
 
 	% the test
-	{result_packet,5,  
+	{result_packet,5,
                     [#field{
                             seq_num=_,
                             catalog= <<"def">>,
@@ -294,7 +297,7 @@ multiple_select(_) ->
                             decoder = _Decoder}],
                        [[<<"Hello World!">>]],
                        <<>>} = Result1,
-	{result_packet,_,  
+	{result_packet,_,
                     [#field{
                             seq_num=_,
                             catalog= <<"def">>,
@@ -367,10 +370,10 @@ select_by_stored_procedure(_) ->
 
 	% find this output by clicking on the test name, then case name in test/index.html
 	ct:log("~p~n", [Result3]),
-	
+
 	% third, main test
 	[{result_packet,5, _Fields, [[<<"Hello World!">>]], <<>>}, {ok_packet,6,0,0,_,0,[]}] = Result3,
-	
+
 	ok.
 
 %%% Conversion routine tests
@@ -415,6 +418,23 @@ proplist_multi_test(_) ->
     Expect = emysql:as_proplist(get_multi_test()),
     ok.
 
+json_empty_test(_) ->
+    [] = emysql_util:as_json(get_empty_test()),
+    [] = emysql:as_json(get_empty_test()),
+    ok.
+
+json_single_test(_) ->
+    Expect = [ [{<<"HelloField">>,<<"Hello">>}] ],
+    Expect = emysql_util:as_json(get_single_test()),
+    Expect = emysql:as_json(get_single_test()),
+    ok.
+
+json_multi_test(_) ->
+    Expect = [ [{<<"HelloField">>,<<"Hello">>},{<<"HiField">>,<<"Hi">>},{<<"ByeField">>,<<"Bye">>}] ],
+    Expect = emysql_util:as_json(get_multi_test()),
+    Expect = emysql:as_json(get_multi_test()),
+    ok.
+
 -record(person, {surname, name, phone, socks}).
 record_test(_Config) ->
     emysql:execute(test_pool, <<"DROP TABLE IF EXISTS as_record_test;">>),
@@ -455,7 +475,7 @@ get_empty_test() ->
                         length = 15,
                         flags = 1,
                         decimals = 31 }],
-        rows = undefined,
+        rows = [],
         extra = <<>>}.
 
 get_single_test() ->
