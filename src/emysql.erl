@@ -749,8 +749,7 @@ monitor_work(Connection0, Timeout, Args) when is_record(Connection0, emysql_conn
                             Parent ! {self(), apply(fun emysql_conn:execute/3, Args)}
                     end),
     receive
-        {'DOWN', Mref, process, Pid, {_, closed}} ->
-            %-% io:format("monitor_work: ~p DOWN/closed -> renew~n", [Pid]),
+        {'DOWN', Mref, process, Pid, tcp_connection_closed} ->
             case emysql_conn:reset_connection(emysql_conn_mgr:pools(), Connection, keep) of
                 NewConnection when is_record(NewConnection, emysql_connection) ->
                     %% re-loop, with new connection.
@@ -763,7 +762,6 @@ monitor_work(Connection0, Timeout, Args) when is_record(Connection0, emysql_conn
             %% if the process dies, reset the connection
             %% and re-throw the error on the current pid.
             %% catch if re-open fails and also signal it.
-            %-% io:format("monitor_work: ~p DOWN ~p -> exit~n", [Pid, Reason]),
             case emysql_conn:reset_connection(emysql_conn_mgr:pools(), Connection, pass) of
                 {error,FailedReset} ->
                     exit({Reason, {and_conn_reset_failed, FailedReset}});
@@ -773,14 +771,12 @@ monitor_work(Connection0, Timeout, Args) when is_record(Connection0, emysql_conn
             %% if the process returns data, unlock the
             %% connection and collect the normal 'DOWN'
             %% message send from the child process
-            %-% io:format("monitor_work: ~p got result -> demonitor ~p, unlock connection ~p, return result~n", [Pid, Mref, Connection#emysql_connection.id]),
             erlang:demonitor(Mref, [flush]),
             emysql_conn_mgr:pass_connection(Connection),
             Result
     after Timeout ->
         %% if we timeout waiting for the process to return,
         %% then reset the connection and throw a timeout error
-        %-% io:format("monitor_work: ~p TIMEOUT -> demonitor, reset connection, exit~n", [Pid]),
         erlang:demonitor(Mref, [flush]),
         exit(Pid, kill),
         emysql_conn:reset_connection(emysql_conn_mgr:pools(), Connection, pass),

@@ -35,7 +35,14 @@
 
 -spec send_and_recv_packet(port(), iodata(), integer()) -> packet_result() | [packet_result()].
 send_and_recv_packet(Sock, Packet, SeqNum) ->
-    ok = gen_tcp:send(Sock, [<<(size(Packet)):24/little, SeqNum:8>>, Packet]),
+    case gen_tcp:send(Sock, [<<(size(Packet)):24/little, SeqNum:8>>, Packet]) of
+        ok -> ok;
+        {error, closed} ->
+            %% If we can't communicate on the socket since it has been closed, we exit the process
+            %% at this point. The exit reason is caught by `emysql:monitor_work/3` and since it is
+            %% with the atom `conn_tcp_closed` we special-case that and rehandle it properly
+            exit(tcp_connection_closed)
+    end,
     DefaultTimeout = emysql_app:default_timeout(),
     case response_list(Sock, DefaultTimeout, ?SERVER_MORE_RESULTS_EXIST) of
         % This is a bit murky. It's compatible with former Emysql versions
