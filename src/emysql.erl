@@ -48,9 +48,11 @@
 %%      crypto:start(),
 %%      emysql:start(),
 %%
-%%      emysql:add_pool(hello_pool, 1,
-%%          "hello_username", "hello_password", "localhost", 3306,
-%%          "hello_database", utf8),
+%%      emysql:add_pool(hello_pool, [{size,1},
+%%                   {user,"hello_username"},
+%%                   {password,"hello_password"},
+%%                   {database,"hello_database"},
+%%                   {encoding,utf8}]),
 %%
 %%      emysql:execute(hello_pool,
 %%          <<"INSERT INTO hello_table SET hello_text = 'Hello World!'">>),
@@ -125,7 +127,7 @@
 -export([
 	affected_rows/1,
 	result_type/1,
-         field_names/1,
+        field_names/1,
          insert_id/1
 ]).
 
@@ -221,25 +223,11 @@ default_timeout() ->
 %%
 %% === Implementation ===
 %%
-%% Refer to add_pool/8 for implementation details.
 
--record(pool_settings,{size,user,password,host,port,database,encoding,start_cmds,connect_timeout}).
-
-add_pool(PoolId, Options) when is_list(Options) ->
-    Size = proplists:get_value(size, Options, 5),
-    User = proplists:get_value(user, Options, ""),
-    Password = proplists:get_value(password, Options, ""),
-    Host = proplists:get_value(host, Options, "127.0.0.1"),
-    Port = proplists:get_value(port, Options, 3306),
-    Database = proplists:get_value(database, Options, undefined),
-    Encoding = proplists:get_value(encoding, Options, latin1),
-    StartCmds = proplists:get_value(start_cmds, Options, []),
-    ConnectTimeout = proplists:get_value(connect_timeout, Options, infinity),
-    add_pool(PoolId,#pool_settings{size=Size, user=User, password=Password,
-			  host=Host, port=Port, database=Database,
-			  encoding=Encoding, start_cmds=StartCmds, 
-			  connect_timeout=ConnectTimeout});
-add_pool(PoolId, #pool_settings{size=Size,user=User,password=Password,host=Host,port=Port,
+% Checks whether a configuration is superficially valid. It checks types and such,
+% it does not check existance of the database or correctness of passwords (that
+% happens when we try to connect to the database.
+config_ok(#pool{pool_id=PoolId,size=Size,user=User,password=Password,host=Host,port=Port,
 		       database=Database,encoding=Encoding,start_cmds=StartCmds,
 		       connect_timeout=ConnectTimeout})
   when is_atom(PoolId),
@@ -251,7 +239,34 @@ add_pool(PoolId, #pool_settings{size=Size,user=User,password=Password,host=Host,
        is_list(Database) orelse Database == undefined,
        is_atom(Encoding),
        is_list(StartCmds),
-       is_integer(ConnectTimeout) orelse ConnectTimeout == infinity ->
+       is_integer(ConnectTimeout) orelse ConnectTimeout == infinity  ->
+    ok;
+config_ok(_BadOptions) ->
+    erlang:error(badarg).
+
+%% Creates a pool record, opens n=Size connections and calls
+%% emysql_conn_mgr:add_pool() to make the pool known to the pool management.
+%% emysql_conn_mgr:add_pool() is translated into a blocking gen-server call.
+
+add_pool(PoolId, Options) when is_list(Options) ->
+    Size = proplists:get_value(size, Options, 5),
+    User = proplists:get_value(user, Options, ""),
+    Password = proplists:get_value(password, Options, ""),
+    Host = proplists:get_value(host, Options, "127.0.0.1"),
+    Port = proplists:get_value(port, Options, 3306),
+    Database = proplists:get_value(database, Options, undefined),
+    Encoding = proplists:get_value(encoding, Options, latin1),
+    StartCmds = proplists:get_value(start_cmds, Options, []),
+    ConnectTimeout = proplists:get_value(connect_timeout, Options, infinity),
+    add_pool(#pool{pool_id=PoolId,size=Size, user=User, password=Password,
+			  host=Host, port=Port, database=Database,
+			  encoding=Encoding, start_cmds=StartCmds, 
+			  connect_timeout=ConnectTimeout}).
+
+add_pool(#pool{pool_id=PoolId,size=Size,user=User,password=Password,host=Host,port=Port,
+		       database=Database,encoding=Encoding,start_cmds=StartCmds,
+		       connect_timeout=ConnectTimeout}=PoolSettings)->
+    config_ok(PoolSettings),
     case emysql_conn_mgr:has_pool(PoolId) of
         true -> 
             {error,pool_already_exists};
@@ -289,9 +304,6 @@ add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding) ->
 %%
 %% === Implementation ===
 %%
-%% Creates a pool record, opens n=Size connections and calls
-%% emysql_conn_mgr:add_pool() to make the pool known to the pool management.
-%% emysql_conn_mgr:add_pool() is translated into a blocking gen-server call.
 %% @end doc: hd feb 11
 -spec add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds) -> Result
     when
@@ -308,17 +320,8 @@ add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding) ->
 add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds) ->
     add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds, infinity).
 
-add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds, ConnectTimeout)
-  when is_atom(PoolId),
-       is_integer(Size),
-       is_list(User),
-       is_list(Password),
-       is_list(Host),
-       is_integer(Port),
-       is_list(Database) orelse Database == undefined,
-       is_atom(Encoding),
-       is_list(StartCmds),
-       is_integer(ConnectTimeout) orelse ConnectTimeout == infinity ->
+add_pool(PoolId, Size, User, Password, Host, Port, Database, 
+	 Encoding, StartCmds, ConnectTimeout)->    
     add_pool(PoolId,[{size,Size},{user,User},{password,Password},
 		     {host,Host},{port,Port},{database,Database},
 		     {encoding,Encoding},{start_cmds,StartCmds},
@@ -401,9 +404,11 @@ decrement_pool_size(PoolId, Num) when is_integer(Num) ->
 %%  crypto:start(),
 %%  application:start(emysql),
 %%
-%%  emysql:add_pool(hello_pool, 1,
-%%      "hello_username", "hello_password", "localhost", 3306,
-%%      "hello_database", utf8),
+%%  emysql:add_pool(hello_pool, [{size,1},
+%%      {user,"hello_username"},
+%%      {password,"hello_password"},
+%%      {database,"hello_database"},
+%%      {encoding,utf8}]),
 %%
 %%  emysql:execute(hello_pool,
 %%      <<"INSERT INTO hello_table SET hello_text = 'Hello World!'">>),

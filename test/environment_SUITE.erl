@@ -123,7 +123,7 @@ init_per_testcase(_TestCase, Config) ->
 
 end_per_testcase(_TestCase, _Config) ->  
     application:unset_env(emysql, pools),
-    emysql:remove_pool(?POOL);
+    catch emysql:remove_pool(?POOL);
 
 end_per_testcase(_, _) ->
     ok.
@@ -142,8 +142,6 @@ connecting_to_db_and_creating_a_pool_transition(_) ->
 
 
 add_pool_utf8(_) ->
-    %emysql:add_pool(?POOL, 10, test_helper:test_u(), test_helper:test_p(),
-    %    "localhost", 3306, undefined, utf8),
     emysql:add_pool(?POOL, [{user,test_helper:test_u()}, 
 			    {password,test_helper:test_p()},
 			    {encoding, utf8}]),
@@ -170,12 +168,9 @@ add_pool_latin1_deprecated(_) ->
     #result_packet{rows=[[<<"latin1">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 
-% TODO: Not sure you really want latin1 to be the default encoding.
 add_pool_latin1_compatible(_) ->
     emysql:add_pool(?POOL, [{user,test_helper:test_u()}, 
 			    {password,test_helper:test_p()}]),
-    %emysql:add_pool(?POOL, 10, test_helper:test_u(), test_helper:test_p(),
-    %    "localhost", 3306, undefined, undefined),
     #result_packet{rows=[[<<"latin1">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 
