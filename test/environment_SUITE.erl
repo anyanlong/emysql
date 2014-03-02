@@ -27,15 +27,12 @@
 
 -export([
         all/0,
+	init_per_suite/1,
+	end_per_suite/1,
         init_per_testcase/2,
         end_per_testcase/2,
 
-        initializing_crypto_app/1,
-        initializing_emysql_app/1,
-
         connecting_to_db_and_creating_a_pool_transition/1,
-        insert_a_record/1,
-        select_a_record/1,
 
         add_pool_utf8/1,
         add_pool_utf8_deprecated/1,
@@ -59,11 +56,7 @@
 %%--------------------------------------------------------------------
 all() -> 
     [
-        initializing_crypto_app,
-        initializing_emysql_app,
         connecting_to_db_and_creating_a_pool_transition,
-        insert_a_record,
-        select_a_record,
 
         add_pool_utf8,
         add_pool_utf8_deprecated,
@@ -81,6 +74,15 @@ all() ->
         add_pool_env_defaults,
         add_pool_env_all
     ].
+
+init_per_suite(Config) ->
+    crypto:start(),
+    application:start(emysql),
+    Config.
+
+end_per_suite(Config) ->
+    application:stop(emysql),
+    Config.
 
 init_per_testcase(add_pool_env_defaults, Config) ->
     ok = application:stop(emysql),
@@ -112,77 +114,34 @@ init_per_testcase(add_pool_env_all, Config) ->
 
 %TODO: Probably better to split out test suite into ones that expect the pool to exist and 
 % tests that are about setting up the pool.
-init_per_testcase(T, Config) when
-        T == connecting_to_db_and_creating_a_pool_transition orelse
-        T == insert_a_record orelse
-        T == select_a_record ->
-    emysql:add_pool(?POOL, 10, test_helper:test_u(),
-        test_helper:test_p(), "localhost", 3306, "hello_database", utf8),
-    Config;
 
-init_per_testcase(_, Config) ->
+init_per_testcase(_TestCase, Config) ->
     Config.
 
-end_per_testcase(T, _) when
-        T == connecting_to_db_and_creating_a_pool_transition orelse
-        T == insert_a_record orelse
-        T == select_a_record orelse
-        T == add_pool_utf8 orelse
-        T == add_pool_utf8_deprecated orelse
-        T == add_pool_latin1 orelse
-        T == add_pool_latin1_deprecated orelse
-        T == add_pool_latin1_compatible orelse
-        T == add_pool_latin1_compatible_deprecated orelse
-        T == add_pool_time_zone_deprecated orelse
-        T == add_pool_time_zone ->
-	emysql:remove_pool(?POOL);
+% If the test created a pool, we should remove it. Note that we should do this even
+% For the tests that are supposed to fail, in case they accidentally succeed.
 
-end_per_testcase(T, _) when
-        T == add_pool_env_defaults orelse
-        T == add_pool_env_all ->
+end_per_testcase(_TestCase, _Config) ->  
     application:unset_env(emysql, pools),
-    emysql:remove_pool(?POOL);
+    catch emysql:remove_pool(?POOL);
 
 end_per_testcase(_, _) ->
-    ok.
-
-% Test Case: Test if the crypt app is available. This detects a path error.
-%%--------------------------------------------------------------------
-initializing_crypto_app(_) ->
-    crypto:start(),
-    ok.
-
-% Test Case: Test if the emysql app is available. This detects a path error.
-%%--------------------------------------------------------------------
-initializing_emysql_app(_) ->
-    application:start(emysql),
     ok.
 
 %% Test case: test obsolete transitional API
 %%--------------------------------------------------------------------
 connecting_to_db_and_creating_a_pool_transition(_) ->
+    emysql:add_pool(?POOL, [{user,test_helper:test_u()},
+			    {password,test_helper:test_p()},
+			    {database,"hello_database"},
+			    {encoding, utf8}]),
     #result_packet{rows=[[<<"hello_database">>]]} =
-    emysql:execute(?POOL, <<"SELECT DATABASE();">>),
+	emysql:execute(?POOL, <<"SELECT DATABASE();">>),
     #result_packet{rows=[[<<"utf8">>]]} =
-    emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
-
-% Test Case: Test if we can insert a record.
-%%--------------------------------------------------------------------
-insert_a_record(_) ->
-    #ok_packet{} = emysql:execute(?POOL, <<"DELETE FROM hello_table">>),
-    #ok_packet{} = emysql:execute(?POOL,
-        <<"INSERT INTO hello_table SET hello_text = 'Hello World!'">>).
-
-% Test Case: Test if we can select records.
-%%--------------------------------------------------------------------
-select_a_record(_) ->
-    #result_packet{rows=[[<<"Hello World!">>]]} =
-    emysql:execute(?POOL, <<"select hello_text from hello_table">>).
+	emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 
 
 add_pool_utf8(_) ->
-    %emysql:add_pool(?POOL, 10, test_helper:test_u(), test_helper:test_p(),
-    %    "localhost", 3306, undefined, utf8),
     emysql:add_pool(?POOL, [{user,test_helper:test_u()}, 
 			    {password,test_helper:test_p()},
 			    {encoding, utf8}]),
@@ -209,12 +168,9 @@ add_pool_latin1_deprecated(_) ->
     #result_packet{rows=[[<<"latin1">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 
-% TODO: Not sure you really want latin1 to be the default encoding.
 add_pool_latin1_compatible(_) ->
     emysql:add_pool(?POOL, [{user,test_helper:test_u()}, 
 			    {password,test_helper:test_p()}]),
-    %emysql:add_pool(?POOL, 10, test_helper:test_u(), test_helper:test_p(),
-    %    "localhost", 3306, undefined, undefined),
     #result_packet{rows=[[<<"latin1">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
 
@@ -330,9 +286,9 @@ add_pool_size_should_be_a_number(_) ->
 
 add_pool_timeout_should_be_a_number(_) ->
     {Pid, Mref} = spawn_monitor(fun() ->
-                Results = emysql:add_pool([{user,test_helper:test_u()},
-					   {password,test_helper:test_p()},
-					   {connect_timeout,"TimeoutNotANumber"}])
+                emysql:add_pool([{user,test_helper:test_u()},
+				 {password,test_helper:test_p()},
+				 {connect_timeout,"TimeoutNotANumber"}])
         end
     ),
     receive

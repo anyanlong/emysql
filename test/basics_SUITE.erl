@@ -44,6 +44,9 @@ all() ->
     [delete_all,
      encode_atoms,
      insert_only,
+     insert_a_record,
+     select_a_record,
+
      insert_and_read_back,
      insert_and_read_back_as_recs,
      insert_and_read_back_as_json,
@@ -123,6 +126,21 @@ insert_only(_) ->
         <<"INSERT INTO hello_table SET hello_text = 'Hello World!'">>),
 
     ok.
+
+%TODO: Probably don't need to keep botht his and insert_only
+% Test Case: Test if we can insert a record.
+%%--------------------------------------------------------------------
+insert_a_record(_) ->
+    #ok_packet{} = emysql:execute(test_pool, <<"DELETE FROM hello_table">>),
+    #ok_packet{} = emysql:execute(test_pool,
+        <<"INSERT INTO hello_table SET hello_text = 'Hello World!'">>).
+
+% Test Case: Test if we can select records.
+%%--------------------------------------------------------------------
+select_a_record(_) ->
+    #result_packet{rows=[[<<"Hello World!">>]]} =
+    emysql:execute(test_pool, <<"select hello_text from hello_table">>).
+
 
 %% Test Case: Allow insertion of atom values through the encoder
 %%--------------------------------------------------------------------
