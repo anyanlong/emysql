@@ -26,15 +26,64 @@
 %% OTHER DEALINGS IN THE SOFTWARE.
 
 
--record(pool, {pool_id, size, user, password, host, port, database, encoding, available=queue:new(), locked=gb_trees:empty(), waiting=queue:new(), start_cmds=[], conn_test_period=0, connect_timeout=infinity}).
--record(emysql_connection, {id, pool_id, encoding, socket, version, thread_id, caps, language, prepared=gb_trees:empty(), locked_at, alive=true, test_period=0, last_test_time=0, monitor_ref}).
+-record(pool, {pool_id :: atom(), 
+	       size :: number(), 
+	       user :: list(), 
+	       password :: list(), 
+	       host :: list(), 
+	       port :: number(), 
+	       database :: list(), 
+	       encoding :: atom(), 
+	       available=queue:new() :: queue(), 
+	       locked=gb_trees:empty() :: gb_tree(), 
+	       waiting=queue:new() :: queue(), 
+	       start_cmds=[] :: list(), 
+	       conn_test_period=0 :: number(), 
+	       connect_timeout=infinity :: number() | infinity}).
+
+-record(emysql_connection, {id :: list(), 
+			    pool_id :: atom(), 
+			    encoding :: atom(), % maybe could be latin1 | utf8 ?
+			    socket :: inet:socket(), 
+			    version :: number(), 
+			    thread_id :: number(), 
+			    caps :: number(), 
+			    language :: number, 
+			    prepared=gb_trees:empty(), 
+			    locked_at :: number(), 
+			    alive=true :: boolean(), 
+			    test_period=0 :: number(), 
+			    last_test_time=0 :: number(), 
+			    monitor_ref :: reference()}).
+
 -record(greeting, {protocol_version, server_version, thread_id, salt1, salt2, caps, caps_high, language, status, seq_num, plugin}).
 -record(field, {seq_num, catalog, db, table, org_table, name, org_name, type, default, charset_nr, length, flags, decimals, decoder}).
--record(packet, {size, seq_num, data}).
--record(ok_packet, {seq_num, affected_rows, insert_id, status, warning_count, msg}).
--record(error_packet, {seq_num, code, status, msg}).
--record(eof_packet, {seq_num, status, warning_count}). % extended to mySQL 4.1+ format
--record(result_packet, {seq_num, field_list, rows, extra}).
+-record(packet, {size :: number(), 
+		 seq_num :: number(), 
+		 data :: binary()}).
+-record(ok_packet, {seq_num :: number(), 
+		    affected_rows :: number(), 
+		    insert_id :: number(), 
+		    status :: number(), 
+		    warning_count :: number(), 
+		    msg :: list()
+			 | {error, list(), unicode:latin1_chardata() | unicode:chardata() | unicode:external_chardata()}
+			 | {incomplete, list(), binary()}}).
+
+% It's unfortunate that error_packet's status is binary when the status of other
+% packets is a number.
+-record(error_packet, {seq_num :: number(), 
+		       code :: number(), 
+		       status :: binary(), 
+		       msg :: [byte()]}).
+
+-record(eof_packet, {seq_num :: number(), 
+		     status :: number(), 
+		     warning_count :: number()}). % extended to mySQL 4.1+ format
+
+-record(result_packet, {seq_num :: number(), 
+			field_list :: list(),
+			rows, extra}).
 
 -define(TIMEOUT, 8000).
 -define(LOCK_TIMEOUT, 5000).
