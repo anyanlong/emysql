@@ -26,8 +26,6 @@
 %% OTHER DEALINGS IN THE SOFTWARE.
 
 
--type socket() :: port().
-
 -record(pool, {pool_id :: atom(), 
 	       size :: number(), 
 	       user :: list(), 
@@ -46,7 +44,7 @@
 -record(emysql_connection, {id :: list(), 
 			    pool_id :: atom(), 
 			    encoding :: atom(), % maybe could be latin1 | utf8 ?
-			    socket :: socket(), 
+			    socket :: inet:socket(), 
 			    version :: number(), 
 			    thread_id :: number(), 
 			    caps :: number(), 
