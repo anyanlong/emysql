@@ -26,6 +26,8 @@
 %% OTHER DEALINGS IN THE SOFTWARE.
 
 
+-type socket() :: port().
+
 -record(pool, {pool_id :: atom(), 
 	       size :: number(), 
 	       user :: list(), 
@@ -64,10 +66,10 @@
 -record(ok_packet, {seq_num :: number(), 
 		    affected_rows :: number(), 
 		    insert_id :: number(), 
-		    status, 
-		    warning_count, 
+		    status :: number(), 
+		    warning_count :: number(), 
 		    msg :: list()
-			 | {error, list(), latin1_chardata() | chardata() | external_chardata()}
+			 | {error, list(), unicode:latin1_chardata() | unicode:chardata() | unicode:external_chardata()}
 			 | {incomplete, list(), binary()}}).
 
 -record(error_packet, {seq_num :: number(), 
@@ -79,7 +81,9 @@
 		     status :: number(), 
 		     warning_count :: number()}). % extended to mySQL 4.1+ format
 
--record(result_packet, {seq_num, field_list, rows, extra}).
+-record(result_packet, {seq_num :: number(), 
+			field_list :: list(),
+			rows, extra}).
 
 -define(TIMEOUT, 8000).
 -define(LOCK_TIMEOUT, 5000).
