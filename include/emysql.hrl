@@ -52,7 +52,7 @@
 			    caps :: number(), 
 			    language :: number, 
 			    prepared=gb_trees:empty(), 
-			    locked_at :: number, 
+			    locked_at :: number(), 
 			    alive=true :: boolean(), 
 			    test_period=0 :: number(), 
 			    last_test_time=0 :: number(), 
@@ -62,7 +62,7 @@
 -record(field, {seq_num, catalog, db, table, org_table, name, org_name, type, default, charset_nr, length, flags, decimals, decoder}).
 -record(packet, {size :: number(), 
 		 seq_num :: number(), 
-		 data}).
+		 data :: binary()}).
 -record(ok_packet, {seq_num :: number(), 
 		    affected_rows :: number(), 
 		    insert_id :: number(), 
@@ -72,10 +72,12 @@
 			 | {error, list(), unicode:latin1_chardata() | unicode:chardata() | unicode:external_chardata()}
 			 | {incomplete, list(), binary()}}).
 
+% It's unfortunate that error_packet's status is binary when the status of other
+% packets is a number.
 -record(error_packet, {seq_num :: number(), 
 		       code :: number(), 
-		       status :: number(), 
-		       msg :: binary()}).
+		       status :: binary(), 
+		       msg :: [byte()]}).
 
 -record(eof_packet, {seq_num :: number(), 
 		     status :: number(), 

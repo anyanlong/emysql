@@ -110,7 +110,7 @@ parse_response(_Sock, _Timeout, #packet{seq_num = SeqNum, data = <<255:8, ErrNo:
     { #error_packet{
         seq_num = SeqNum,
         code = ErrNo,
-        status = 0,
+        status = <<0>>,
         msg = binary_to_list(Msg) }, % todo: test and possibly conversion to UTF-8
      ?SERVER_NO_STATUS, Buff };
 
