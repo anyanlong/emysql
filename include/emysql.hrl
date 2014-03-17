@@ -56,8 +56,32 @@
 			    last_test_time=0 :: number(), 
 			    monitor_ref :: reference()}).
 
--record(greeting, {protocol_version, server_version, thread_id, salt1, salt2, caps, caps_high, language, status, seq_num, plugin}).
--record(field, {seq_num, catalog, db, table, org_table, name, org_name, type, default, charset_nr, length, flags, decimals, decoder}).
+-record(greeting, {protocol_version :: number(), 
+                   server_version, 
+                   thread_id :: number(), 
+                   salt1 :: binary(), 
+                   salt2 :: binary(), 
+                   caps :: number(), 
+                   caps_high :: number(), 
+                   language :: number(), 
+                   status :: number(), 
+                   seq_num :: number(), 
+                   plugin :: binary()}).
+
+-record(field, {seq_num, 
+                catalog, 
+                db , 
+                table , 
+                org_table, 
+                name , 
+                org_name, 
+                type, 
+                default, 
+                charset_nr, 
+                length, 
+                flags, 
+                decimals, 
+                decoder}).
 -record(packet, {size :: number(), 
 		 seq_num :: number(), 
 		 data :: binary()}).
