@@ -227,7 +227,7 @@ handle_call({lock_connection, PoolId, Wait, Who}, {From, _Mref}, State) ->
                     %% place the calling pid at the end of the waiting queue of its pool
                     PoolNow = Pool#pool{waiting = queue:in(From, Pool#pool.waiting)},
                     {reply, unavailable, State#state{pools=[PoolNow|OtherPools]}};
-                unavailable  when Wait =:= false ->
+                unavailable when Wait =:= false ->
                     {reply, unavailable, State}
             end;
         undefined ->

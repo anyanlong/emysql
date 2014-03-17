@@ -337,7 +337,6 @@ type_cast_row_data(undefined, _) -> undefined;
 type_cast_row_data(Data, #field{decoder = F}) -> F(Data).
 
 %% lcb/1 decodes length-coded-integer values
-
 lcb(<<>>) -> {<<>>, <<>>}; % This clause should be removed when we have control
 lcb(<< Value:8, Rest/bits >>) when Value =< 250 -> {Value, Rest};
 lcb(<< 252:8, Value:16/little, Rest/bits >>) -> {Value, Rest};
