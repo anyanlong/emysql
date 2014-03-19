@@ -237,12 +237,15 @@ config_ok(#pool{pool_id=PoolId,size=Size,user=User,password=Password,host=Host,p
        is_list(Host),
        is_integer(Port),
        is_list(Database) orelse Database == undefined,
-       is_atom(Encoding) orelse is_tuple(Encoding) andalso tuple_size(Encoding) == 2 andalso is_atom(element(1, Encoding)) andalso is_atom(element(2, Encoding)),
        is_list(StartCmds),
        is_integer(ConnectTimeout) orelse ConnectTimeout == infinity  ->
-    ok;
+    encoding_ok(Encoding);
 config_ok(_BadOptions) ->
     erlang:error(badarg).
+
+encoding_ok(Enc) when is_atom(Enc) -> ok;
+encoding_ok({Enc, Coll}) when is_atom(Enc), is_atom(Coll) -> ok;
+encoding_ok(_)  -> erlang:error(badarg).
 
 %% Creates a pool record, opens n=Size connections and calls
 %% emysql_conn_mgr:add_pool() to make the pool known to the pool management.
