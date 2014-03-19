@@ -74,6 +74,10 @@ set_database(Connection, Database) ->
     emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
 
 set_encoding(_, undefined) -> ok;
+set_encoding(Connection, {Encoding, Collation}) ->
+    Packet = <<?COM_QUERY, "set names '", (erlang:atom_to_binary(Encoding, utf8))/binary, 
+        "' collate '", (erlang:atom_to_binary(Collation, utf8))/binary,"'">>,
+    emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0);
 set_encoding(Connection, Encoding) ->
     Packet = <<?COM_QUERY, "set names '", (erlang:atom_to_binary(Encoding, utf8))/binary, "'">>,
     emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).

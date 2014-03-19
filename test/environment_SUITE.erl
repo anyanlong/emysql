@@ -35,6 +35,7 @@
         connecting_to_db_and_creating_a_pool_transition/1,
 
         add_pool_utf8/1,
+        add_pool_utf8_with_collate/1,
         add_pool_utf8_deprecated/1,
         add_pool_latin1/1,
         add_pool_latin1_deprecated/1,
@@ -59,6 +60,7 @@ all() ->
         connecting_to_db_and_creating_a_pool_transition,
 
         add_pool_utf8,
+        add_pool_utf8_with_collate,
         add_pool_utf8_deprecated,
         add_pool_latin1,
         add_pool_latin1_deprecated,
@@ -147,6 +149,13 @@ add_pool_utf8(_) ->
 			    {encoding, utf8}]),
     #result_packet{rows=[[<<"utf8">>]]} =
     emysql:execute(?POOL, <<"SELECT @@character_set_connection;">>).
+
+add_pool_utf8_with_collate(_) ->
+    emysql:add_pool(?POOL, [{user,test_helper:test_u()}, 
+			    {password,test_helper:test_p()},
+			    {encoding, {utf8, utf8_unicode_ci}}]),
+    #result_packet{rows=[[<<"utf8_unicode_ci">>]]} =
+    emysql:execute(?POOL, <<"select @@collation_connection;">>).
 
 % Note on deprecated tests: keeping while the add_pool/>2 are still part of the api.
 add_pool_utf8_deprecated(_) ->
