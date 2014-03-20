@@ -202,7 +202,7 @@ default_timeout() ->
 %%		         | {host, string()}
 %%		         | {port, integer()}
 %%		         | {database, string() | undefined}
-%%		         | {encoding, atom()}
+%%		         | {encoding, atom() | {atom(), atom()}}
 %%		         | {start_cmds, [binary()]}
 %%		         | {connect_timeout, integer()}
 %%		Result = {reply, {error, pool_already_exists}, state()} | {reply, ok, state() }
@@ -217,7 +217,7 @@ default_timeout() ->
 %% host - host to connect to (defaults to "127.0.0.1")
 %% port - the port to connect to (defaults to 3306)
 %% database - the database to connect to (defaults to undefined)
-%% encoding - the connection encoding (defaults to utf8)
+%% encoding - the connection encoding or {encoding, collation} (defaults to utf8)
 %% start_cmds - a list of commands to execute on connect
 %% connect_timeout - millisecond timeout for connect or infinity (default)
 %%
@@ -237,12 +237,15 @@ config_ok(#pool{pool_id=PoolId,size=Size,user=User,password=Password,host=Host,p
        is_list(Host),
        is_integer(Port),
        is_list(Database) orelse Database == undefined,
-       is_atom(Encoding),
        is_list(StartCmds),
        is_integer(ConnectTimeout) orelse ConnectTimeout == infinity  ->
-    ok;
+    encoding_ok(Encoding);
 config_ok(_BadOptions) ->
     erlang:error(badarg).
+
+encoding_ok(Enc) when is_atom(Enc) -> ok;
+encoding_ok({Enc, Coll}) when is_atom(Enc), is_atom(Coll) -> ok;
+encoding_ok(_)  -> erlang:error(badarg).
 
 %% Creates a pool record, opens n=Size connections and calls
 %% emysql_conn_mgr:add_pool() to make the pool known to the pool management.
@@ -314,7 +317,7 @@ add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding) ->
       Host :: string(),
       Port :: integer(),
       Database :: string(),
-      Encoding :: utf8 | latin1,
+      Encoding :: utf8 | latin1 | {utf8, utf8_unicode_ci} | {utf8, utf8_general_ci},
       StartCmds :: list(binary()),
       Result :: {reply, {error, pool_already_exists}, state()} | {reply, ok, state() }.
 add_pool(PoolId, Size, User, Password, Host, Port, Database, Encoding, StartCmds) ->

@@ -71,22 +71,22 @@ This is an Erlang MySQL driver, based on a rewrite at Electronic Arts. [Easy][Sa
 
 While you can use mysql via ODBC, you should see better performance when using a *driver* like Emysql. For [samples][Samples] and [docs][] see below. Read the brief on [choosing][Choosing] a package and about the [history][History] of the various MySQL drivers.
 
-[Emysql][1] is a cleaner rewrite of [erlang-mysql-driver][2], see [History][]. This fork is a direct continuation of the original [emysql][1] with [fixes][], [updates][], more [documentation][docs] and [samples][Samples]. 
+[Emysql][1] is a cleaner rewrite of [erlang-mysql-driver][2], see [History][]. This fork is a direct continuation of the original [emysql][1] with [fixes][], [updates][], more [documentation][docs] and [samples][Samples].
 
 **This is the master branch. Should you run into problems, please report them by opening an issue at github and try if they go away by checking out the 'stable' branch. Thank you.**
 
 <hr/>
 
- **Which fork/package should I use?** Likely this one, but see [Choosing][].  
- **Why are there so many?** See [History][].  
- **Who used *this* fork?** [Electronic Arts][History].  
- **How do I ...?** See [Samples][].  
- **Hello ...?** See [Samples][].  
+ **Which fork/package should I use?** Likely this one, but see [Choosing][].
+ **Why are there so many?** See [History][].
+ **Who used *this* fork?** [Electronic Arts][History].
+ **How do I ...?** See [Samples][].
+ **Hello ...?** See [Samples][].
 
- **Download:** <https://github.com/Eonblast/Emysql/archives/master>  
- **Docs:** <http://eonblast.github.com/Emysql/>  
- **Issues:** <https://github.com/Eonblast/Emysql/issues>  
- **Repository:** <https://github.com/Eonblast/Emysql>  
+ **Download:** <https://github.com/Eonblast/Emysql/archives/master>
+ **Docs:** <http://eonblast.github.com/Emysql/>
+ **Issues:** <https://github.com/Eonblast/Emysql/issues>
+ **Repository:** <https://github.com/Eonblast/Emysql>
 
 <hr/>
 
@@ -106,7 +106,7 @@ While you can use mysql via ODBC, you should see better performance when using a
 ## Choosing                                             <a name="Choosing"></a>
 
 #### Best
-In most cases, especially for high performance and stability, this package, [Emysql][emysql], will be the best choice. It was rewritten from the ground up to overcome fundamental issues of 'erlang-mysql-driver'. It also has some usable docs meanwhile. 
+In most cases, especially for high performance and stability, this package, [Emysql][emysql], will be the best choice. It was rewritten from the ground up to overcome fundamental issues of 'erlang-mysql-driver'. It also has some usable docs meanwhile.
 
 #### Simple
 If you are looking for the **plain necessities**, you should use the [ejabberd][7] mysql driver. It is simple, battle tested and stable. There are comprehensive instructions in the source comments.
@@ -121,79 +121,94 @@ For **mnesia-style transactions**, one of the multiple '[erlang-mysql-driver][22
 
 ### Hello World
 
-This is a hello world program. Follow the three steps below to try it out. 
-	
-	-module(a_hello).
-	-export([run/0]).
-	
-	run() ->
-	
-		crypto:start(),
-		application:start(emysql),
-	        
-                emysql:add_pool(hello_pool, [{size,1},
-                             {user,"hello_username"},
-                             {password,"hello_password"},
-                             {database,"hello_database"},
-                             {encoding,utf8}]),
+This is a hello world program. Follow the three steps below to try it out.
 
-		emysql:execute(hello_pool,
-			<<"INSERT INTO hello_table SET hello_text = 'Hello World!'">>),
-	
-	        Result = emysql:execute(hello_pool,
-			<<"select hello_text from hello_table">>),
-	
-		io:format("~n~p~n", [Result]).
+```Erlang
+-module(a_hello).
+-export([run/0]).
 
+run() ->
+
+        crypto:start(),
+        application:start(emysql),
+
+        emysql:add_pool(hello_pool, [{size,1},
+                     {user,"hello_username"},
+                     {password,"hello_password"},
+                     {database,"hello_database"},
+                     {encoding,utf8}]),
+
+        emysql:execute(hello_pool,
+                <<"INSERT INTO hello_table SET hello_text = 'Hello World!'">>),
+
+        Result = emysql:execute(hello_pool,
+                <<"select hello_text from hello_table">>),
+
+        io:format("~n~p~n", [Result]).
+```
 
 We'll be coming back to this source to make it run on your machine in a minute. But let's look at the basic building blocks first:
 
 ### Executing an SQL Statement
 
-	emysql:execute(my_pool, <<"SELECT * from mytable">>).
+```Erlang
+emysql:execute(my_pool, <<"SELECT * from mytable">>).
+```
 
 For the exact spec, see below, [Usage][]. Regarding the 'pool', also see below.
 
 ### Executing a Prepared Statement
 
-	emysql:prepare(my_stmt, <<"SELECT * from mytable WHERE id = ?">>).
-	
-	emysql:execute(my_pool, my_stmt, [1]).
+```Erlang
+emysql:prepare(my_stmt, <<"SELECT * from mytable WHERE id = ?">>).
+
+emysql:execute(my_pool, my_stmt, [1]).
+```
 
 ### Executing Stored Procedures
 
-	emysql:execute(my_pool, <<"create procedure my_sp() begin select * from mytable; end">>).
-	
-	emysql:execute(my_pool, <<"call my_sp();">>).
+```Erlang
+emysql:execute(my_pool, <<"create procedure my_sp() begin select * from mytable; end">>).
+
+emysql:execute(my_pool, <<"call my_sp();">>).
+```
 
 ### Result Record
 
-	-record(result_packet, {seq_num, field_list, rows, extra}).
+```Erlang
+-record(result_packet, {seq_num, field_list, rows, extra}).
+```
 	
 ### Converting Row Data To Records
 
-	-record(foo, {bar, baz}).
+```Erlang
+-record(foo, {bar, baz}).
 
-	Result = emysql:execute(pool1, <<"select bar, baz from foo">>).
-	Recs = emysql:as_record(Result, foo, record_info(fields, foo)).
-	Bars = [Foo#foo.bar || Foo <- Recs].
+Result = emysql:execute(pool1, <<"select bar, baz from foo">>).
+Recs = emysql:as_record(Result, foo, record_info(fields, foo)).
+Bars = [Foo#foo.bar || Foo <- Recs].
+```
 
 ### Adding a Connection to the Connection Pool
 
 Emysql uses a sophisticated connection pooling mechanism.
 
-	emysql:add_pool(my_pool, [{size,1}, {user,"myuser"}, {password,"mypass"}, 
-	    {host,"myhost"}, {port,3306},{database,"mydatabase"}, {encoding,utf8}).
+```Erlang
+emysql:add_pool(my_pool, [{size,1}, {user,"myuser"}, {password,"mypass"},
+        {host,"myhost"}, {port,3306},{database,"mydatabase"}, {encoding,utf8}]).
+```
 
-Arbitrary post-connection start-up commands can be added with the proplist key atom 
-```start_cmds```:
+Arbitrary post-connection start-up commands can be added with the proplist key atom
+`start_cmds`:
 
-	emysql:add_pool(my_pool, [{size,1}, {user,"myuser"}, {password,"mypass"}, 
-	    {host,"myhost"}, {port,3306},{database,"mydatabase"}, {encoding,utf8},
-	    {start_cmds,[
-          <<"SET TIME_ZONE='+00:00'">>,
-          <<"SET SQL_MODE='STRICT_ALL_TABLES'">>
-	]).
+```Erlang
+emysql:add_pool(my_pool, [{size,1}, {user,"myuser"}, {password,"mypass"},
+        {host,"myhost"}, {port,3306},{database,"mydatabase"}, {encoding,utf8},
+        {start_cmds,[
+                <<"SET TIME_ZONE='+00:00'">>,
+                <<"SET SQL_MODE='STRICT_ALL_TABLES'">>
+        ]}]).
+```
 
 ### Running Hello World
 
@@ -206,7 +221,7 @@ Build emysql.app, using make:
 	$ cd Emysql
 	$ make
 
-Or use rebar: 
+Or use rebar:
 
 	$ cd Emysql
 	$ ./rebar compile
@@ -237,7 +252,7 @@ That's it. If you need to blindly repeat that more often some time, you can also
 There are more sample programs:
 
 ## More Samples
-Sample programs are in ./samples. 
+Sample programs are in ./samples.
 
 * [a_hello](http://github.com/Eonblast/Emysql/blob/master/samples/a_hello.erl) - Hello World
 * [b_raw](http://github.com/Eonblast/Emysql/blob/master/samples/b_raw.erl) - Hello World, raw output
@@ -273,8 +288,10 @@ General Notes on using Emysql, including the actual specs:
 
 The Emysql driver is an Erlang gen-server, and, application.
 
-	crypto:start(), % Only needed for testing. In a proper release, this would happen automatically
-	application:start(emysql).
+```Erlang
+crypto:start(), % Only needed for testing. In a proper release, this would happen automatically
+application:start(emysql).
+```
 
 #### Adding a Pool                                  <a name="Adding_a_Pool"></a>
 
@@ -290,101 +307,115 @@ returns "raw" responses as "packets" and leaves it up to the calling application
 the result, usually by using one of the conversion routines in `emysql` to turn the data into
 a more suitable format.
 
-	-record(result_packet, {seq_num, field_list, rows, extra}).
-	
-	-record(ok_packet, {seq_num, affected_rows, insert_id, status, warning_count, msg}).
-	
-	-record(error_packet, {seq_num, code, msg}).
+```Erlang
+-record(result_packet, {seq_num, field_list, rows, extra}).
+
+-record(ok_packet, {seq_num, affected_rows, insert_id, status, warning_count, msg}).
+
+-record(error_packet, {seq_num, code, msg}).
+```
 
 For other record types, see include/emysql.hrl.
 
 #### Executing SQL Statements
 
-	% emysql:execute(PoolName, Statement) -> result_packet() | ok_packet() | error_packet()  
-	% PoolName = atom()  
-	% Statement = string() | binary()  
-	
-	emysql:execute(mypoolname, <<"SELECT * from mytable">>).
-	# result_packet{field_list=[...], rows=[...]}
-	
-	emysql:execute(mypoolname, <<"UPDATE mytable SET bar = 'baz' WHERE id = 1">>).
-	# ok_packet{affected_rows=1}
+```Erlang
+% emysql:execute(PoolName, Statement) -> result_packet() | ok_packet() | error_packet()
+% PoolName = atom()
+% Statement = string() | binary()
+
+emysql:execute(mypoolname, <<"SELECT * from mytable">>).
+# result_packet{field_list=[...], rows=[...]}
+
+emysql:execute(mypoolname, <<"UPDATE mytable SET bar = 'baz' WHERE id = 1">>).
+# ok_packet{affected_rows=1}
+```
 
 #### Executing Prepared Statements                          <a name="Executing_Prepared_Statements"></a>
 
-	% emysql:prepare(StmtName, Statement) -> ok  
-	% StmtName = atom()  
-	% Statement = binary() | string()  
+```Erlang
+	% emysql:prepare(StmtName, Statement) -> ok
+	% StmtName = atom()
+	% Statement = binary() | string()
 	
 	emysql:prepare(my_stmt, <<"SELECT * from mytable WHERE id = ?">>).
 	# ok
 
-	% emysql:execute(PoolName, StmtName, Args) -> result_packet() | ok_packet() | error_packet()  
-	% StmtName = atom()  
-	% Args = [term()]  
+	% emysql:execute(PoolName, StmtName, Args) -> result_packet() | ok_packet() | error_packet()
+	% StmtName = atom()
+	% Args = [term()]
 	
 	emysql:execute(mypoolname, my_stmt, [1]).
 	#result_packet{field_list=[...], rows=[...]}
+```
 
 #### Executing Stored Procedures                          <a name="Executing_Stored_Procedures"></a>
 
-	% emysql:execute(PoolName, StmtName, Args) -> result_packet() | ok_packet() | error_packet()  
-	% StmtName = atom()  
-	% Args = [term()]  
-	
-	emysql:execute(hello_pool,
-		<<"create procedure sp_hello() begin select * from hello_table; end">>).
-	{ok_packet,1,0,0,2,0,[]}
-	
-	emysql:execute(hello_pool, <<"call sp_hello();">>).
-	[{result_packet,6,
-	                [{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
-	                        <<"hello_table">>,<<"hello_text">>,<<"hello_text">>,
-	                        254,<<>>,33,60,0,0}],
-	                [[<<"Hello World!">>],[<<"Hello World!">>]],
-	                <<>>},
-	{ok_packet,7,0,0,34,0,[]}]
- 
- Note that you are getting back a list of results here.
- 
+```Erlang
+% emysql:execute(PoolName, StmtName, Args) -> result_packet() | ok_packet() | error_packet()
+% StmtName = atom()
+% Args = [term()]
+
+emysql:execute(hello_pool,
+	<<"create procedure sp_hello() begin select * from hello_table; end">>).
+{ok_packet,1,0,0,2,0,[]}
+
+emysql:execute(hello_pool, <<"call sp_hello();">>).
+[{result_packet,6,
+                [{field,2,<<"def">>,<<"hello_database">>,<<"hello_table">>,
+                        <<"hello_table">>,<<"hello_text">>,<<"hello_text">>,
+                        254,<<>>,33,60,0,0}],
+                [[<<"Hello World!">>],[<<"Hello World!">>]],
+                <<>>},
+ {ok_packet,7,0,0,34,0,[]}]
+```
+
+Note that you are getting back a list of results here.
+
 #### Converting Row Data To Records
 
-	% emysql:as_record(ResultPacket, RecordName, Fields) -> Result  
-	% ResultPacket = result_packet()  
-	% RecordName = atom() (the name of the record to generate)  
-	% Fields = [atom()] (the field names to generate for each record)  
-	% Result = [record()]  
-	
-	-module(fetch_example).
-	-record(foo, {bar, baz, bat}).
-	
-	fetch_foo() ->
-	   Result = emysql:execute(pool1, <<"select bar, baz, bat from foo">>),
-	   Recs = emysql:as_record(Result, foo, record_info(fields, foo)),
-	   [begin
-		  io:format("foo: ~p, ~p, ~p~n", [Foo#foo.bar, Foo#foo.baz, Foo#foo.bat])
-	    end || Foo <- Recs].
+```Erlang
+% emysql:as_record(ResultPacket, RecordName, Fields) -> Result
+% ResultPacket = result_packet()
+% RecordName = atom() (the name of the record to generate)
+% Fields = [atom()] (the field names to generate for each record)
+% Result = [record()]
+
+-module(fetch_example).
+-record(foo, {bar, baz, bat}).
+
+fetch_foo() ->
+        Result = emysql:execute(pool1, <<"select bar, baz, bat from foo">>),
+        Recs = emysql:as_record(Result, foo, record_info(fields, foo)),
+        [begin
+                io:format("foo: ~p, ~p, ~p~n", [Foo#foo.bar, Foo#foo.baz, Foo#foo.bat])
+         end || Foo <- Recs].
+```
 
 #### Converting Row Data To JSON
 
-	% emysql:as_json(ResultPacket) -> Result
-	% Result = [json()]
+```Erlang
+% emysql:as_json(ResultPacket) -> Result
+% Result = [json()]
 
-	Result = emysql:execute(pool1, <<"select bar, baz from foo">>),
+Result = emysql:execute(pool1, <<"select bar, baz from foo">>),
 
-	JSON = emysql:as_json(Result).
-	% [[{<<"bar">>,<<"bar_value">>}, {<<"baz">>,<<"baz_value">>}], ...]
+JSON = emysql:as_json(Result).
+% [[{<<"bar">>,<<"bar_value">>}, {<<"baz">>,<<"baz_value">>}], ...]
+```
 
 Note that you are getting back a list of erlang terms in accordance with EEP-18.
 For actual utf8 binary JSON string you will need external library like [jsx](https://github.com/talentdeficit/jsx) or [jiffy](https://github.com/davisp/jiffy)
 
 #### Loading Data From a File
 
-	emysql:execute(hello_pool,
-		<<"LOAD DATA INFILE 'hello.txt' INTO TABLE hello_table (hello_text)">>).
+```Erlang
+emysql:execute(hello_pool,
+        <<"LOAD DATA INFILE 'hello.txt' INTO TABLE hello_table (hello_text)">>).
+```
 
-Note, you must grant: 
-    
+Note, you must grant:
+
     grant file on *.* to hello_username@localhost identified by'hello_password';
 
 You need to give LOCAL or an absolute path, else the file is expected in the database server root. To use the current directory:
@@ -402,8 +433,8 @@ You need to give LOCAL or an absolute path, else the file is expected in the dat
 ### Basic Tests
 
 Some Common Tests (Unit Tests) have been added in the `test` folder. They have
-no significant coverage yet but can help to test the basics. They might also 
-help you find trip ups in your system set up (environment and basics suites). 
+no significant coverage yet but can help to test the basics. They might also
+help you find trip ups in your system set up (environment and basics suites).
 
 For the basic tests you only need the test database set up and a mysql server running, the same as described above for the samples:
 
@@ -447,29 +478,29 @@ Fredrik, Nick and Jacob helped shedding light on the matter. Thank you very much
 
 ### Links and References
 
-[1]: http://github.com/JacobVorreuter/emysql "emysql"  
-[2]: http://github.com/dizzyd/erlang-mysql-driver "erlang-mysql-driver"   
-[3]: http://www.kth.se/ "Royal Institute of Technology"   
-[4]: https://github.com/fredrikt/yxa/tree/master/src/mysql "Yxa mysql driver"   
-[5]: http://www.stacken.kth.se/project/yxa/index.html "Yxa Home"   
-[6]: https://github.com/fredrikt/yxa "Yxa repository at github"   
-[7]: http://svn.process-one.net/ejabberd-modules/mysql/trunk/   
-    "ejabberd mysql driver"  
-[8]: https://support.process-one.net "Process One Home"  
-[9]: http://www.process-one.net/en/ejabberd/ "ejabberd Home"  
-[10]: https://github.com/processone/ejabberd/ "ejabberd repository at github"  
-[11]: https://support.process-one.net/doc/display/CONTRIBS/Yxa   
-     "ejabberd MySQL 4.1. patch"  
-[12]: https://github.com/Eonblast/Emysql/tree/master/doc/diff-ejabberd-yxa.txt  
-     "Diff of Yxa and ejabberd mysql drivers"  
-[13]: https://github.com/Eonblast/Emysql/tree/master/doc/diff-ejabberd-yxa-2.txt  
-     "Diff of Yxa and ejabberd mysql drivers ignoring comment changes"  
-[14]: http://code.google.com/p/erlang-mysql-driver/   
-     "original erlang-mysql-driver"  
-[15]: http://github.com/dizzyd/erlang-mysql-driver   
-     "Dave Smith's erlang-mysql-driver at github, currently not maintained"  
-[16]: https://github.com/dizzyd/erlang-mysql-driver/network   
-     "Fork graph of erlang-mysql-driver at github"  
+[1]: http://github.com/JacobVorreuter/emysql "emysql"
+[2]: http://github.com/dizzyd/erlang-mysql-driver "erlang-mysql-driver"
+[3]: http://www.kth.se/ "Royal Institute of Technology"
+[4]: https://github.com/fredrikt/yxa/tree/master/src/mysql "Yxa mysql driver"
+[5]: http://www.stacken.kth.se/project/yxa/index.html "Yxa Home"
+[6]: https://github.com/fredrikt/yxa "Yxa repository at github"
+[7]: http://svn.process-one.net/ejabberd-modules/mysql/trunk/
+    "ejabberd mysql driver"
+[8]: https://support.process-one.net "Process One Home"
+[9]: http://www.process-one.net/en/ejabberd/ "ejabberd Home"
+[10]: https://github.com/processone/ejabberd/ "ejabberd repository at github"
+[11]: https://support.process-one.net/doc/display/CONTRIBS/Yxa
+     "ejabberd MySQL 4.1. patch"
+[12]: https://github.com/Eonblast/Emysql/tree/master/doc/diff-ejabberd-yxa.txt
+     "Diff of Yxa and ejabberd mysql drivers"
+[13]: https://github.com/Eonblast/Emysql/tree/master/doc/diff-ejabberd-yxa-2.txt
+     "Diff of Yxa and ejabberd mysql drivers ignoring comment changes"
+[14]: http://code.google.com/p/erlang-mysql-driver/
+     "original erlang-mysql-driver"
+[15]: http://github.com/dizzyd/erlang-mysql-driver
+     "Dave Smith's erlang-mysql-driver at github, currently not maintained"
+[16]: https://github.com/dizzyd/erlang-mysql-driver/network
+     "Fork graph of erlang-mysql-driver at github"
 [17]: http://www.stacken.kth.se/projekt/yxa/mysql-0.1.tar.gz
       "Earliest Yxa mysql driver"
 [18]: http://forge.mysql.com/wiki/MySQL_Internals_ClientServer_Protocol
@@ -487,18 +518,18 @@ Fredrik, Nick and Jacob helped shedding light on the matter. Thank you very much
 [24]: https://github.com/Eonblast/Emysql/commits/master
       "Commits in the current Eonblast Emysql branch"
 
-      
-[ma]: mailto:ahltorp@nada.kth.se        "Magnus Ahltorp"  
+
+[ma]: mailto:ahltorp@nada.kth.se        "Magnus Ahltorp"
 [fr]: mailto:ft@it.su.se                "Fredrik Thulin"
-[mr]: mailto:mickael.remond@process-one.net    "Mickael Remond"  
-[ys]: http://yarivsblog.blogspot.com    "Yariv Sadan"  
+[mr]: mailto:mickael.remond@process-one.net    "Mickael Remond"
+[ys]: http://yarivsblog.blogspot.com    "Yariv Sadan"
 [ds]: mailto:dizzyd@dizzyd.com          "Dave Smith"
 [ng]: https://github.com/ngerakines     "Nick Gerakines"
-[jv]: https://github.com/JacobVorreuter "Jacob Vorreuter"  
-[bw]: mailto:bill@rupture.com           "Bill Warnecke"  
-[hd]: mailto:hd2010@eonblast.com        "Henning Diedrich"  
-[vb]: https://github.com/bva            "Vitaliy Batichko"  
-[cr]: https://github.com/csrl           "Chris Rempel"  
+[jv]: https://github.com/JacobVorreuter "Jacob Vorreuter"
+[bw]: mailto:bill@rupture.com           "Bill Warnecke"
+[hd]: mailto:hd2010@eonblast.com        "Henning Diedrich"
+[vb]: https://github.com/bva            "Vitaliy Batichko"
+[cr]: https://github.com/csrl           "Chris Rempel"
 [pa]: mailto:partoa@gmail.com           "Patrick Atambo"
 [jm]: mailto:joel.meyer@openx.org       "Joel Meyer"
 [es]: https://github.com/eseres         "Erik Seres"
@@ -510,14 +541,14 @@ Fredrik, Nick and Jacob helped shedding light on the matter. Thank you very much
 [rr]: https://github.com/ransomr        "Ransom Richardson"
 [ql]: https://github.com/qingliangcn    "Qing Liang"
 
-[emysql]:   https://github.com/Eonblast/Emysql  
-           "Eonblast Emysql Repository"  
-[fixes]:   https://github.com/Eonblast/Emysql/issues/closed  
-           "Emysql fixes"  
+[emysql]:   https://github.com/Eonblast/Emysql
+           "Eonblast Emysql Repository"
+[fixes]:   https://github.com/Eonblast/Emysql/issues/closed
+           "Emysql fixes"
 [updates]: https://github.com/Eonblast/Emysql/commits/master
            "Emysql updates"
-[docs]:    http://eonblast.github.com/Emysql/  
-           "Emysql online docs"  
+[docs]:    http://eonblast.github.com/Emysql/
+           "Emysql online docs"
 
 ## Links                                                    <a name=Links></a>
 
@@ -551,11 +582,11 @@ Eonblast Corporation <http://www.eonblast.com>.
 
 Permission is  hereby  granted,  free of charge,  to any person
 obtaining  a copy of this software and associated documentation
-files  (the  "Software"),  to  deal  in  the  Software  without 
+files  (the  "Software"),  to  deal  in  the  Software  without
 restriction,  including  without limitation  the rights to use,
-copy, modify,  merge,  publish, distribute,  sublicense, and/or 
+copy, modify,  merge,  publish, distribute,  sublicense, and/or
 sell  copies of the  Software,  and to permit  persons  to whom
-the  Software  is furnished to do so,  subject to the following 
+the  Software  is furnished to do so,  subject to the following
 conditions:
 
 The above copyright notice and this permission notice shall be
