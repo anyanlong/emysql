@@ -33,7 +33,7 @@
 	       host :: list(), 
 	       port :: number(), 
 	       database :: list(), 
-	       encoding :: atom(), 
+	       encoding :: utf8 | latin1 | {utf8, utf8_unicode_ci} | {utf8, utf8_general_ci},
 	       available=queue:new() :: queue(), 
 	       locked=gb_trees:empty() :: gb_tree(), 
 	       waiting=queue:new() :: queue(), 
