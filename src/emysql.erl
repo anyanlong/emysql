@@ -243,9 +243,9 @@ config_ok(#pool{pool_id=PoolId,size=Size,user=User,password=Password,host=Host,p
 config_ok(_BadOptions) ->
     erlang:error(badarg).
 
-encoding_ok(Enc) when is_atom(Enc) -> ok;
-encoding_ok({Enc, Coll}) when is_atom(Enc), is_atom(Coll) -> ok;
-encoding_ok(_)  -> erlang:error(badarg).
+encoding_ok(Enc) when is_atom(Enc) ->  ok; 
+encoding_ok({Enc, Coll}) when is_atom(Enc), is_atom(Coll) -> ok; 
+encoding_ok(_)  ->  erlang:error(badarg).
 
 %% Creates a pool record, opens n=Size connections and calls
 %% emysql_conn_mgr:add_pool() to make the pool known to the pool management.
