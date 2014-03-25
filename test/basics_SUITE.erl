@@ -55,6 +55,7 @@ all() ->
 	 select_by_stored_procedure,
      multiple_select,
      encode_floating_point_data,
+     emit_warnings,
      {group, conversion}].
 
 groups() ->
@@ -84,9 +85,15 @@ init_per_suite(Config) ->
 	% if this fails, focus on environment_SUITE to fix test setup.
     crypto:start(),
     application:start(emysql),
-    emysql:add_pool(test_pool, 1,
-        test_helper:test_u(), test_helper:test_p(), "localhost", 3306,
-        "hello_database", utf8),
+    emysql:add_pool(test_pool, [
+        {size, 1},
+        {user, test_helper:test_u()},
+        {password, test_helper:test_p()},
+        {host, "localhost"},
+        {port, 3306},
+        {database, "hello_database"},
+        {encoding, utf8},
+        {warnings, true}]),
 
     Config.
 
@@ -201,6 +208,12 @@ encode_floating_point_data(_Config) ->
 
     ct:log("Result: ~p", [Result]),
     ok_packet = element(1, Result),
+    ok.
+
+emit_warnings(_Config) ->
+    Result = emysql:execute(test_pool, <<"DROP TABLE IF EXISTS not_a_table">>),
+    %% Test: there should be exactly 1 warning.
+    #ok_packet{warning_count = 1} = Result,
     ok.
 
 %% Test Case: Make an Insert and Select it back, reading out as Record

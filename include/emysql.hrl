@@ -39,7 +39,8 @@
 	       waiting=queue:new() :: queue(), 
 	       start_cmds=[] :: list(), 
 	       conn_test_period=0 :: number(), 
-	       connect_timeout=infinity :: number() | infinity}).
+	       connect_timeout=infinity :: number() | infinity,
+	       warnings=false :: boolean()}).
 
 -record(emysql_connection, {id :: list(), 
 			    pool_id :: atom(), 
@@ -54,7 +55,8 @@
 			    alive=true :: boolean(), 
 			    test_period=0 :: number(), 
 			    last_test_time=0 :: number(), 
-			    monitor_ref :: reference()}).
+			    monitor_ref :: reference(),
+			    warnings=false :: boolean()}).
 
 -record(greeting, {protocol_version :: number(), 
                    server_version, 
