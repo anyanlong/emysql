@@ -28,20 +28,20 @@
 
 -record(pool, {pool_id :: atom(), 
 	       size :: number(), 
-	       user :: list(), 
-	       password :: list(), 
-	       host :: list(), 
+	       user :: string(), 
+	       password :: string(), 
+	       host :: string(), 
 	       port :: number(), 
-	       database :: list(), 
+	       database :: string(), 
 	       encoding :: utf8 | latin1 | {utf8, utf8_unicode_ci} | {utf8, utf8_general_ci},
 	       available=queue:new() :: queue(), 
 	       locked=gb_trees:empty() :: gb_tree(), 
 	       waiting=queue:new() :: queue(), 
-	       start_cmds=[] :: list(), 
+	       start_cmds=[] :: string(), 
 	       conn_test_period=0 :: number(), 
 	       connect_timeout=infinity :: number() | infinity}).
 
--record(emysql_connection, {id :: list(), 
+-record(emysql_connection, {id :: string(), 
 			    pool_id :: atom(), 
 			    encoding :: atom(), % maybe could be latin1 | utf8 ?
 			    socket :: inet:socket(), 
@@ -57,7 +57,7 @@
 			    monitor_ref :: reference()}).
 
 -record(greeting, {protocol_version :: number(), 
-                   server_version, 
+                   server_version :: binary(), 
                    thread_id :: number(), 
                    salt1 :: binary(), 
                    salt2 :: binary(), 
@@ -68,20 +68,20 @@
                    seq_num :: number(), 
                    plugin :: binary()}).
 
--record(field, {seq_num, 
-                catalog, 
-                db , 
-                table , 
-                org_table, 
-                name , 
-                org_name, 
-                type, 
-                default, 
-                charset_nr, 
-                length, 
-                flags, 
-                decimals, 
-                decoder}).
+-record(field, {seq_num :: number(), 
+                catalog :: binary(), 
+                db :: binary(), 
+                table :: binary(), 
+                org_table :: binary(), 
+                name :: binary(), 
+                org_name :: binary(), 
+                type :: number(), 
+                default :: number(), 
+                charset_nr :: number(), 
+                length :: number(), 
+                flags :: number(), 
+                decimals :: number(), 
+                decoder :: fun()}).
 -record(packet, {size :: number(), 
 		 seq_num :: number(), 
 		 data :: binary()}).
@@ -90,9 +90,9 @@
 		    insert_id :: number(), 
 		    status :: number(), 
 		    warning_count :: number(), 
-		    msg :: list()
-			 | {error, list(), unicode:latin1_chardata() | unicode:chardata() | unicode:external_chardata()}
-			 | {incomplete, list(), binary()}}).
+		    msg :: string()
+			 | {error, string(), unicode:latin1_chardata() | unicode:chardata() | unicode:external_chardata()}
+			 | {incomplete, string(), binary()}}).
 
 % It's unfortunate that error_packet's status is binary when the status of other
 % packets is a number.
