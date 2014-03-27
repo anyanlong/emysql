@@ -65,7 +65,7 @@ package: clean
 install:
 	@for i in ebin/*.beam ebin/*.app include/*.hrl src/*.erl; do install -m 644 -D $$i $(prefix)/$(LIBDIR)/$(PKGNAME)-$(VERSION)/$$i ; done
 
-all-test: test testutil
+all-test: test
 
 CT_OPTS ?=
 CT_RUN = ct_run \
