@@ -205,6 +205,7 @@ default_timeout() ->
 %%		         | {encoding, atom() | {atom(), atom()}}
 %%		         | {start_cmds, [binary()]}
 %%		         | {connect_timeout, integer()}
+%%		         | {warnings, boolean()}
 %%		Result = {reply, {error, pool_already_exists}, state()} | {reply, ok, state() }
 %%
 %% @doc Synchronous call to the connection manager to add a pool.
@@ -220,6 +221,7 @@ default_timeout() ->
 %% encoding - the connection encoding or {encoding, collation} (defaults to utf8)
 %% start_cmds - a list of commands to execute on connect
 %% connect_timeout - millisecond timeout for connect or infinity (default)
+%% warnings - whether to fetch and log MySQL warnings automatically (defaults to false)
 %%
 %% === Implementation ===
 %%
