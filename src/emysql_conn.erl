@@ -90,11 +90,11 @@ execute(Connection, StmtName, []) when is_atom(StmtName) ->
     prepare_statement(Connection, StmtName),
     StmtNameBin = atom_to_binary(StmtName, utf8),
     Packet = <<?COM_QUERY, "EXECUTE ", StmtNameBin/binary>>,
-    emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0);
-execute(#emysql_connection { socket = Sock }, Query, []) ->
+    send_recv(Connection, Packet);
+execute(Connection, Query, []) ->
     QB = canonicalize_query(Query),
     Packet = <<?COM_QUERY, QB/binary>>,
-    emysql_tcp:send_and_recv_packet(Sock, Packet, 0);
+    send_recv(Connection, Packet);
 execute(Connection, Query, Args) when (is_list(Query) orelse is_binary(Query)) andalso is_list(Args) ->
     StmtName = "stmt_"++integer_to_list(erlang:phash2(Query)),
     ok = prepare(Connection, StmtName, Query),
@@ -103,7 +103,7 @@ execute(Connection, Query, Args) when (is_list(Query) orelse is_binary(Query)) a
         OK when is_record(OK, ok_packet) ->
             ParamNamesBin = list_to_binary(string:join([[$@ | integer_to_list(I)] || I <- lists:seq(1, length(Args))], ", ")),  % todo: utf8?
             Packet = <<?COM_QUERY, "EXECUTE ", (list_to_binary(StmtName))/binary, " USING ", ParamNamesBin/binary>>,  % todo: utf8?
-            emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0);
+            send_recv(Connection, Packet);
         Error ->
             Error
     end,
@@ -117,7 +117,7 @@ execute(Connection, StmtName, Args) when is_atom(StmtName), is_list(Args) ->
             ParamNamesBin = list_to_binary(string:join([[$@ | integer_to_list(I)] || I <- lists:seq(1, length(Args))], ", ")),  % todo: utf8?
             StmtNameBin = atom_to_binary(StmtName, utf8),
             Packet = <<?COM_QUERY, "EXECUTE ", StmtNameBin/binary, " USING ", ParamNamesBin/binary>>,
-            emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0);
+            send_recv(Connection, Packet);
         Error ->
             Error
     end.
@@ -127,7 +127,7 @@ prepare(Connection, Name, Statement) when is_atom(Name) ->
 prepare(Connection, Name, Statement) ->
     StatementBin = encode(Statement, binary),
     Packet = <<?COM_QUERY, "PREPARE ", (list_to_binary(Name))/binary, " FROM ", StatementBin/binary>>,  % todo: utf8?
-    case emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0) of
+    case send_recv(Connection, Packet) of
         OK when is_record(OK, ok_packet) ->
             ok;
         Err when is_record(Err, error_packet) ->
@@ -138,7 +138,7 @@ unprepare(Connection, Name) when is_atom(Name)->
     unprepare(Connection, atom_to_list(Name));
 unprepare(Connection, Name) ->
     Packet = <<?COM_QUERY, "DEALLOCATE PREPARE ", (list_to_binary(Name))/binary>>,  % todo: utf8?
-    emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
+    send_recv(Connection, Packet).
 
 open_n_connections(PoolId, N) ->
     case emysql_conn_mgr:find_pool(PoolId, emysql_conn_mgr:pools()) of
@@ -205,7 +205,8 @@ open_connection(#pool{pool_id=PoolId, host=Host, port=Port, user=User,
                             caps = Caps,
                             language = Language,
                             test_period = Pool#pool.conn_test_period,
-                            last_test_time = now_seconds()
+                            last_test_time = now_seconds(),
+                            warnings = Pool#pool.warnings
                            },
             %%-% io:format("~p open connection: ... set db ...~n", [self()]),
             ok = set_database_or_die(Connection, Database),
@@ -339,6 +340,22 @@ now_seconds() ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
+
+%% @doc A wrapper for emysql_tcp:send_and_recv_packet/3 that may log warnings if any.
+send_recv(#emysql_connection{socket = Socket, warnings = Warnings}, Packet) ->
+    Ret = emysql_tcp:send_and_recv_packet(Socket, Packet, 0),
+    Warnings andalso log_warnings(Socket, Ret),
+    Ret.
+
+log_warnings(Socket, #ok_packet{warning_count = WarningCount}) when WarningCount > 0 ->
+    %% Fetch the warnings and log them in the OTP way.
+    #result_packet{rows = WarningRows} =
+        emysql_tcp:send_and_recv_packet(Socket, <<?COM_QUERY, "SHOW WARNINGS">>, 0),
+    WarningMessages = [Message || [_Level, _Code, Message] <- WarningRows],
+    error_logger:warning_report({emysql_warnings, WarningMessages});
+log_warnings(_Sock, _OtherPacket) ->
+    ok.
+
 set_params(_, _, [], Result) -> Result;
 set_params(Connection, Num, Values, _) ->
 	Packet = set_params_packet(Num, Values),

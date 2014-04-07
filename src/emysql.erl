@@ -205,6 +205,7 @@ default_timeout() ->
 %%		         | {encoding, atom() | {atom(), atom()}}
 %%		         | {start_cmds, [binary()]}
 %%		         | {connect_timeout, integer()}
+%%		         | {warnings, boolean()}
 %%		Result = {reply, {error, pool_already_exists}, state()} | {reply, ok, state() }
 %%
 %% @doc Synchronous call to the connection manager to add a pool.
@@ -220,6 +221,7 @@ default_timeout() ->
 %% encoding - the connection encoding or {encoding, collation} (defaults to utf8)
 %% start_cmds - a list of commands to execute on connect
 %% connect_timeout - millisecond timeout for connect or infinity (default)
+%% warnings - whether to fetch and log MySQL warnings automatically (defaults to false)
 %%
 %% === Implementation ===
 %%
@@ -229,7 +231,7 @@ default_timeout() ->
 % happens when we try to connect to the database.
 config_ok(#pool{pool_id=PoolId,size=Size,user=User,password=Password,host=Host,port=Port,
 		       database=Database,encoding=Encoding,start_cmds=StartCmds,
-		       connect_timeout=ConnectTimeout})
+		       connect_timeout=ConnectTimeout,warnings=Warnings})
   when is_atom(PoolId),
        is_integer(Size),
        is_list(User),
@@ -238,7 +240,8 @@ config_ok(#pool{pool_id=PoolId,size=Size,user=User,password=Password,host=Host,p
        is_integer(Port),
        is_list(Database) orelse Database == undefined,
        is_list(StartCmds),
-       is_integer(ConnectTimeout) orelse ConnectTimeout == infinity  ->
+       is_integer(ConnectTimeout) orelse ConnectTimeout == infinity,
+       is_boolean(Warnings) ->
     encoding_ok(Encoding);
 config_ok(_BadOptions) ->
     erlang:error(badarg).
@@ -261,14 +264,15 @@ add_pool(PoolId, Options) when is_list(Options) ->
     Encoding = proplists:get_value(encoding, Options, latin1),
     StartCmds = proplists:get_value(start_cmds, Options, []),
     ConnectTimeout = proplists:get_value(connect_timeout, Options, infinity),
+    Warnings = proplists:get_value(warnings, Options, false),
     add_pool(#pool{pool_id=PoolId,size=Size, user=User, password=Password,
 			  host=Host, port=Port, database=Database,
 			  encoding=Encoding, start_cmds=StartCmds, 
-			  connect_timeout=ConnectTimeout}).
+			  connect_timeout=ConnectTimeout, warnings=Warnings}).
 
 add_pool(#pool{pool_id=PoolId,size=Size,user=User,password=Password,host=Host,port=Port,
 		       database=Database,encoding=Encoding,start_cmds=StartCmds,
-		       connect_timeout=ConnectTimeout}=PoolSettings)->
+		       connect_timeout=ConnectTimeout,warnings=Warnings}=PoolSettings)->
     config_ok(PoolSettings),
     case emysql_conn_mgr:has_pool(PoolId) of
         true -> 
@@ -284,7 +288,8 @@ add_pool(#pool{pool_id=PoolId,size=Size,user=User,password=Password,host=Host,po
                     database = Database,
                     encoding = Encoding,
                     start_cmds = StartCmds,
-                    connect_timeout = ConnectTimeout
+                    connect_timeout = ConnectTimeout,
+                    warnings = Warnings
                     },
             Pool2 = case emysql_conn:open_connections(Pool) of
                 {ok, Pool1} -> Pool1;
