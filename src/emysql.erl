@@ -133,6 +133,9 @@
 
 -type state() :: any().
 
+%% Stop the warning in Erlang 17 about dict() being deprecated in favour of dict:dict()
+-compile(nowarn_deprecated_type).
+
 % for record and constant defines
 -include("emysql.hrl").
 
@@ -669,7 +672,7 @@ result_type(#eof_packet{})    -> eof.
 -spec as_dict(Result) -> Dict
   when
     Result :: #result_packet{},
-    Dict :: dict:dict().
+    Dict :: dict().
 as_dict(Res) -> emysql_conv:as_dict(Res).
 
 
