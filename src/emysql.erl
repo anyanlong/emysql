@@ -133,9 +133,6 @@
 
 -type state() :: any().
 
-%% Stop the warning in Erlang 17 about dict() being deprecated in favour of dict:dict()
--compile(nowarn_deprecated_type).
-
 % for record and constant defines
 -include("emysql.hrl").
 
