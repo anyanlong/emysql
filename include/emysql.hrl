@@ -180,3 +180,6 @@
 %  number of result set columns.
 -define(SERVER_STATUS_METADATA_CHANGED, 1024).
 
+%  Wrap the query result in erlang record
+-define(AS_REC(Rec), [Rec, record_info(fields, Rec)]). 
+
