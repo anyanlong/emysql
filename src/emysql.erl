@@ -114,6 +114,8 @@
             default_timeout/0
 ]).
 
+-export([transaction/2, transaction/3, abort/1]).
+
 %% Result Conversion API
 -export([
          as_dict/1,
@@ -630,6 +632,16 @@ execute(PoolId, StmtName, Args, Timeout, nonblocking) when is_atom(StmtName), is
         unavailable ->
             unavailable
     end.
+
+transaction(PoolId, Fun) ->
+    transaction(PoolId, Fun, default_timeout()).
+
+transaction(PoolId, Fun, Timeout) ->
+    Connection = emysql_conn_mgr:wait_for_connection(PoolId),
+    monitor_work(Connection, Timeout, [Connection, transaction, Fun]).
+
+abort(Reason) ->
+    throw(Reason).
 
 %% @doc Return the field names of a result packet
 %% @end

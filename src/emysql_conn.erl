@@ -86,6 +86,28 @@ set_encoding(Connection, Encoding) ->
 canonicalize_query(Q) when is_binary(Q) -> Q;
 canonicalize_query(QL) when is_list(QL) -> iolist_to_binary(QL).
 
+execute(Connection, transaction, Fun) when is_function(Fun) ->
+    case begin_transaction(Connection) of
+        #ok_packet{} ->
+            try Fun(Connection) of
+                Val ->
+                    case commit_transaction(Connection) of
+                        #ok_packet{} ->
+                            {atomic, Val};
+                        #error_packet{} = ErrorPacket ->
+                            {aborted, {commit_error, ErrorPacket}}
+                    end
+            catch
+                throw:Reason ->
+                    rollback_transaction(Connection),
+                    {aborted, Reason};
+                Class:Exception ->
+                    rollback_transaction(Connection),
+                    erlang:raise(Class, Exception, erlang:get_stacktrace())
+            end;
+        #error_packet{} = ErrorPacket ->
+            {aborted, {begin_error, ErrorPacket}}
+    end;
 execute(Connection, StmtName, []) when is_atom(StmtName) ->
     prepare_statement(Connection, StmtName),
     StmtNameBin = atom_to_binary(StmtName, utf8),
@@ -139,6 +161,15 @@ unprepare(Connection, Name) when is_atom(Name)->
 unprepare(Connection, Name) ->
     Packet = <<?COM_QUERY, "DEALLOCATE PREPARE ", (list_to_binary(Name))/binary>>,  % todo: utf8?
     send_recv(Connection, Packet).
+
+begin_transaction(Connection) ->
+    emysql_conn:execute(Connection, <<"BEGIN">>, []).
+
+rollback_transaction(Connection) ->
+    emysql_conn:execute(Connection, <<"ROLLBACK">>, []).
+
+commit_transaction(Connection) ->
+    emysql_conn:execute(Connection, <<"COMMIT">>, []).
 
 open_n_connections(PoolId, N) ->
     case emysql_conn_mgr:find_pool(PoolId, emysql_conn_mgr:pools()) of
