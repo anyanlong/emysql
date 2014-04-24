@@ -164,7 +164,10 @@ start_pools(MySqlOpt) ->
 
     lists:foldl(
       fun({PoolName, PoolSize}, AccIn) ->
-              case emysql:add_pool(PoolName, PoolSize, UserName, Password,
+              case emysql:add_pool(PoolName,
+                                   PoolSize,
+                                   UserName,
+                                   Password,
                                    Host, Port, Database, Encoding) of
                   ok -> [PoolName | AccIn];
                   {error, Reason} ->
