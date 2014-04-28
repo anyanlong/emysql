@@ -66,7 +66,7 @@ start_link(MySqlOpts) ->
 %%--------------------------------------------------------------------
 init([undefined]) ->
     {ok, #state{pools = []}};
-init([MySqlOpt]) ->  % MySqlOpt is proplist
+init([MySqlOpt]) when is_list(MySqlOpt) ->  % MySqlOpt is proplist
     Pools = start_pools(MySqlOpt),
     {ok, #state{pools = Pools}}.
 
@@ -156,7 +156,7 @@ code_change(_OldVsn, State, _Extra) ->
 start_pools(MySqlOpt) ->
     Host = proplists:get_value(host, MySqlOpt, "localhost"),
     Port = proplists:get_value(port, MySqlOpt, 3306),
-    UserName = proplists:get_value(username, MySqlOpt, "root"),
+    UserName = proplists:get_value(user, MySqlOpt, "root"),
     Password = proplists:get_value(password, MySqlOpt),
     Encoding = proplists:get_value(encoding, MySqlOpt, utf8),
     Database = proplists:get_value(database, MySqlOpt),
@@ -165,10 +165,13 @@ start_pools(MySqlOpt) ->
     lists:foldl(
       fun({PoolName, PoolSize}, AccIn) ->
               case emysql:add_pool(PoolName,
-                                   PoolSize,
-                                   UserName,
-                                   Password,
-                                   Host, Port, Database, Encoding) of
+                                   [{size,     type_utils:any_to_integer(PoolSize)},
+                                    {user,     type_utils:any_to_list(UserName)},
+                                    {password, type_utils:any_to_list(Password)},
+                                    {host,     type_utils:any_to_list(Host)},
+                                    {port,     type_utils:any_to_integer(Port)},
+                                    {database, type_utils:any_to_list(Database)},
+                                    {encoding, Encoding}] ) of
                   ok -> [PoolName | AccIn];
                   {error, Reason} ->
                       io:format("EMysqlPool add pool<~p> failed: ~p",
