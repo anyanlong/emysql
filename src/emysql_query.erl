@@ -11,6 +11,9 @@
 %% API
 -export([]).
 
+
+-include("emysql.hrl").
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -25,7 +28,7 @@
 %% @end
 %%--------------------------------------------------------------------
 find_first(ConnOrPool, Table, SqlOptions, AsRec) ->
-    NSqlOptions = proplists:delete(limit, SqlOptions).
+    NSqlOptions = proplists:delete(limit, SqlOptions),
     find(ConnOrPool, Table, [{limit, 1} | NSqlOptions], AsRec).
 
 
@@ -39,7 +42,7 @@ find_first(ConnOrPool, Table, SqlOptions, AsRec) ->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-find(ConnOrPool, Table, SqlOptions, [Rec, Fileds] = _AsRec)  ->
+find(ConnOrPool, Table, SqlOptions, [Rec, RecFields] = _AsRec)  ->
     {FindSql, CondVals} = build_sql(Table, SqlOptions),
     Result = case ConnOrPool of
                  #emysql_connection{} = Conn ->
@@ -87,9 +90,9 @@ find_each(Connection, Table, SqlOptions, Size, AsRec, Fun) ->
 %%% Internal functions
 %%%===================================================================
 build_sql(Table, SqlOptions) ->
-    SelectF =  proplists:get_value(select, SqlOptions, "*") 
+    SelectF =  proplists:get_value(select, SqlOptions, "*"), 
         
-    Select = "SELECT " + SelectF + " FROM " ++ type_utils:any_to_list(Table),
+    Select = "SELECT " ++ SelectF ++ " FROM " ++ type_utils:any_to_list(Table),
     {Where, CondVals} = case proplists:get_value(where, SqlOptions) of
                             undefined -> " ";
                             [Cond | Values] -> {Cond, Values}
@@ -99,7 +102,8 @@ build_sql(Table, SqlOptions) ->
 
 
 md5_hex(S) ->
-    lists:flatten([io_lib:format("~.16b",[N]) || <> <= erlang:md5(S)]).
+    S.
+    % lists:flatten([io_lib:format("~.16b",[N]) || <<>> <= erlang:md5(S)]).
                              
             
                     
