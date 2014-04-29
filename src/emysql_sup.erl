@@ -39,5 +39,5 @@ init(_) ->
            {emysql_conn_mgr,
             {emysql_conn_mgr, start_link, []}, permanent, 5000, worker, [emysql_conn_mgr]},
            {execute_trace,
-            {execute_trace, start_link, []}, permanent, 5000, worker, [execute_trace]},
+            {execute_trace, start_link, []}, permanent, 5000, worker, [execute_trace]}
     ]}}.
