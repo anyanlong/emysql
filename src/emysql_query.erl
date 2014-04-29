@@ -30,7 +30,7 @@
 %%--------------------------------------------------------------------
 find(ConnPool, [RawSql | Values]) ->
     StmtName = type_utils:md5_hex(RawSql),
-    emysql:prepare(StmtName, type_utils:any_to_binay(RawSql)),
+    emysql:prepare(StmtName, type_utils:any_to_binary(RawSql)),
     case emysql:execute(ConnPool, StmtName, Values) of
         #ok_packet{} = OkPacket       -> OkPacket;
         #error_packet{} = ErrorPacket -> ErrorPacket
