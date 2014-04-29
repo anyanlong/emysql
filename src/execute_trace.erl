@@ -13,6 +13,7 @@
 %% API
 -export([prepare/2,
          unprepare/1,
+         execute/1,
          execute/2,
          begin_transaction/0,
          commit_transaction/0,
@@ -63,9 +64,9 @@ unprepare(Name) ->
 execute(StmtName) ->
     execute(StmtName, []).
 execute(raw_query, Query) ->
-    gen_server:cast(?SERVER, {raw_query, Query}).    
+    gen_server:cast(?SERVER, {raw_query, Query});  
 execute(StmtName, Params) ->
-    gen_server:cast(?SERVER, {execute, type_utils:any_to_binary(StmtName), Statement}).
+    gen_server:cast(?SERVER, {execute, type_utils:any_to_binary(StmtName), Params}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -94,18 +95,6 @@ commit_transaction() ->
 %%--------------------------------------------------------------------
 rollback_transaction() ->
     gen_server:cast(?SERVER, rollback).
-
-
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%%
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-execute(StmtName, Statement) ->
-    gen_server:cast(?SERVER, {execute, StmtName, Statement}).
 
 
 
@@ -171,14 +160,14 @@ handle_cast({prepare, Name, Statement}, #state{stmts = Stmts}=State) ->
                      orddict:store(Name, [Statement, 1], Stmts);
                  {ok, [Statement, Ref]} ->
                      orddict:store(Name, [Statement, Ref + 1], Stmts);
-                 {ok, [TheStatemnt, _]} ->
+                 {ok, [TheStatement, _]} ->
                      lager:error("Prepare statement (~p) conflicted: ~p <-> ~p",
                                  [Name, TheStatement, Statement]),
                      Stmts
              end,
     {noreply, State#state{stmts = NStmts}};
 
-handle_cast({unprepare, Name}, #state{stmt = Stmts} = State) ->
+handle_cast({unprepare, Name}, #state{stmts = Stmts} = State) ->
     NStmts = case orddict:find(Name, Stmts) of
                  error -> Stmts;
                  {ok, [Statement, 1]} ->
@@ -194,7 +183,7 @@ handle_cast({execute, Name, Params}, #state{stmts = Stmts}=State) ->
             lager:warning("No statement (~p) found", [Name]);
         {ok, Statement} ->
             lager:debug("Execute ~p: ~p~nParams: ~p",
-                        [Name, Statment, Params])
+                        [Name, Statement, Params])
     end,
     {noreply, State};
 

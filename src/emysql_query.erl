@@ -33,7 +33,7 @@ find(ConnOrPool, [RawSql | Values]) ->
         #emysql_connection{} = Conn ->
             mysql_conn:execute(Conn, RawSql, Values);
         Pool ->
-            emysql:execute(ConnPool, RawSql, Values)
+            emysql:execute(Pool, RawSql, Values)
     end.
 
 %%--------------------------------------------------------------------
