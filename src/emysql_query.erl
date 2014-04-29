@@ -28,10 +28,13 @@
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-find(ConnPool, [RawSql | Values]) ->
-    StmtName = type_utils:any_to_atom("stmt_" ++ type_utils:md5_hex(RawSql)),
-    emysql:prepare(StmtName, type_utils:any_to_binary(RawSql)),
-    emysql:execute(ConnPool, StmtName, Values).
+find(ConnOrPool, [RawSql | Values]) ->
+    case ConnOrPool of
+        #emysql_connection{} = Conn ->
+            mysql_conn:execute(Conn, RawSql, Values);
+        Pool ->
+            emysql:execute(ConnPool, RawSql, Values)
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -44,12 +47,12 @@ find(ConnPool, [RawSql | Values]) ->
 %% @end
 %%--------------------------------------------------------------------
 find(ConnOrPool, Table, SqlOptions, [Rec, RecFields] = _AsRec)  ->
-    {Sql, CondVals} = build_sql(Table, SqlOptions),
+    {FindSql, _, CondVals} = build_sql(Table, SqlOptions),
     Result = case ConnOrPool of
                  #emysql_connection{} = Conn ->
-                     emysql_conn:execute(Conn, Sql, CondVals);
+                     emysql_conn:execute(Conn, FindSql, CondVals);
                  Pool ->
-                     emysql:execute(Pool, Sql, CondVals)
+                     emysql:execute(Pool, FindSql, CondVals)
              end,
     emysql_util:as_record(Result, Rec, RecFields).
 
@@ -83,6 +86,9 @@ find_first(ConnOrPool, Table, SqlOptions, AsRec) ->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
+find_each(ConnOrPool, Table, SqlOptions, AsRec, Fun) ->
+    find_each(ConnOrPool, Table, SqlOptions, 1000, AsRec, Fun).
+
 find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun) ->
     {FindSql, CountSql, CondVals} = build_sql(Table, SqlOptions),
     Result = case ConnOrPool of
@@ -133,7 +139,9 @@ build_sql(Table, SqlOptions) ->
         end,
         
     {Where, CondVals} = case proplists:get_value(where, SqlOptions) of
-                            undefined -> "";
+                            undefined -> {"", [ ]};
+                            [ ]       -> {"", [ ]};
+                            [ Cond ]     -> {"WHERE " ++ Cond, [ ]};
                             [Cond | Values] -> {"WHERE " ++ Cond, Values}
                         end,
     
