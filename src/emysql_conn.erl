@@ -127,7 +127,7 @@ execute(Connection, Query, Args) when (is_list(Query) orelse is_binary(Query)) a
         OK when is_record(OK, ok_packet) ->
             ParamNamesBin = list_to_binary(string:join([[$@ | integer_to_list(I)] || I <- lists:seq(1, length(Args))], ", ")),  % todo: utf8?
             Packet = <<?COM_QUERY, "EXECUTE ", (list_to_binary(StmtName))/binary, " USING ", ParamNamesBin/binary>>,  % todo: utf8?
-            execute_trace:execute(StmtName, ParamNamesBin),
+            execute_trace:execute(StmtName, Args),
             send_recv(Connection, Packet);
         Error ->
             Error

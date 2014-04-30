@@ -181,9 +181,9 @@ handle_cast({execute, Name, Params}, #state{stmts = Stmts}=State) ->
     case orddict:find(Name, Stmts) of
         error ->
             lager:warning("No statement (~p) found", [Name]);
-        {ok, Statement} ->
-            lager:debug("Execute ~p: ~p~nParams: ~p",
-                        [Name, Statement, Params])
+        {ok, [Statement, _Ref]} ->
+            lager:debug("Execute ~p: ~p", [Name, Statement]),
+            lager:debug("Params  ~p: ~p", [Name, Params]) 
     end,
     {noreply, State};
 
