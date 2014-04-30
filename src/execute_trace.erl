@@ -170,7 +170,7 @@ handle_cast({prepare, Name, Statement}, #state{stmts = Stmts}=State) ->
 handle_cast({unprepare, Name}, #state{stmts = Stmts} = State) ->
     NStmts = case orddict:find(Name, Stmts) of
                  error -> Stmts;
-                 {ok, [Statement, 1]} ->
+                 {ok, [_Statement, 1]} ->
                      orddict:erase(Name, Stmts);
                  {ok, [Statement, Ref]} ->
                      orddict:store(Name, [Statement, Ref - 1], Stmts)
@@ -191,6 +191,18 @@ handle_cast({raw_query, Query}, #state{}=State) ->
     lager:debug("Query: ~p", [Query]),
     {noreply, State};
 
+
+handle_cast(begin_transaction, State) ->
+    lager:debug("BEGIN TRANSACTION"),
+    {noreply, State};
+
+handle_cast(commit_transaction, State) ->
+    lager:debug("COMMIT"),
+    {noreply, State};
+
+handle_cast(rollback_transaction, State) ->
+    lager:debug("ROLLBACK"),
+    {noreply, State};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.

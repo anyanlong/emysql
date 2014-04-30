@@ -168,12 +168,15 @@ unprepare(Connection, Name) ->
     send_recv(Connection, Packet).
 
 begin_transaction(Connection) ->
+    execute_trace:begin_transaction(),
     emysql_conn:execute(Connection, <<"BEGIN">>, []).
 
 rollback_transaction(Connection) ->
+    execute_trace:rollback_transaction(),
     emysql_conn:execute(Connection, <<"ROLLBACK">>, []).
 
 commit_transaction(Connection) ->
+    execute_trace:commit_transaction(),
     emysql_conn:execute(Connection, <<"COMMIT">>, []).
 
 open_n_connections(PoolId, N) ->
