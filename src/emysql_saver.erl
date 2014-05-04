@@ -37,52 +37,64 @@ save(ConnOrPool, Table, RecordInput) ->
     save(ConnOrPool, Table, RecordInput, DefOpt).
 
 save(ConnOrPool, Table, [Records, Fields] = _RecordInput, Options) ->
-    
+    [FieldPK | _ ] = Fields,
     case build_sql(Table, Records, Fields, Options) of
         {insert, Sqls} ->
-            lists:foldl(
-              X = fun({Sql, Values}, AccIn) ->
+            X = lists:foldl(
+                  fun({Sql, Values}, AccIn) ->
                           Result = case ConnOrPool of
                                        #emysql_connection{} = Conn ->
                                            emysql_conn:execute(Conn, Sql, Values);
                                        Pool ->
                                            emysql:execute(Pool, Sql, Values)
                                    end,
-                          %case Result of
-                          %    #ok_packat{effect}
-                          %case {Affected, length(Records), lists:nth(1, Fields)} of
-                          %    {1, 1, id} ->
-                          %        [Record] = Records,
-                          %        [setelement(2, Record, InsertId) | AccIn];
-                          %    _         -> AccIn
-                          %end
-                          ok
+                          case Result of
+                              #ok_packet{affected_rows = Affected, insert_id = InsertId} ->
+                                  case {Affected, length(Records), FieldPK} of
+                                      {1, 1, id} ->
+                                          [Record] = Records,
+                                          [setelement(2, Record, InsertId) | AccIn];
+                                      _         -> AccIn
+                                  end;
+                              #error_packet{code = Code, msg = Msg} ->
+                                  throw({Code, Msg})
+                          end
                   end, [], Sqls),
             case X of
                 [] -> ok;
                 [V] -> V
             end;
         {update, {Sql, Values} } ->
-             Result = case ConnOrPool of
-                          #emysql_connection{} = Conn ->
-                              emysql_conn:execute(Conn, Sql, Values);
-                          Pool ->
-                              emysql:execute(Pool, Sql, Values)
-                      end,
-            ok
+             case ConnOrPool of
+                 #emysql_connection{} = Conn ->
+                     emysql_conn:execute(Conn, Sql, Values);
+                 Pool ->
+                     emysql:execute(Pool, Sql, Values)
+             end
     end.
 
 %%--------------------------------------------------------------------
 %% @doc
 %% 
-%% emysql_saver:find_or_create_by(pool, test, )
+%% emysql_saver:find_or_create_by(pool, test, ["select * from test where data = ?", "hello"],
+%%                                            fun() ->
+%%                                                ?INPUT(#test{data = "find me"})
+%%                                            end)
 %% 
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-find_or_create_by(ConnOrPool, Table, FindCond, CreateFun) ->
-    [ConnOrPool, Table, FindCond, CreateFun],
-    ok.
+find_or_create_by(ConnOrPool, Table, FindSql, CreateFun) ->
+    Result = emysql_query:find(ConnOrPool, FindSql),
+    [[Record], Fields] = CreateFun(),
+    case Result of
+        #result_packet{rows = Rows} when length(Rows) =:= 0 ->
+            save(ConnOrPool, Table, [[Record], Fields]);
+        #result_packet{} ->
+            emysql_conv:as_record(Result, element(1, Record), Fields);
+        Other ->
+            Other
+    end.
 
 %%%===================================================================
 %%% Internal functions
