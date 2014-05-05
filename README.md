@@ -284,6 +284,18 @@ or (after building emysql.app and the database, as explained above), start a_hel
 
 General Notes on using Emysql, including the actual specs:
 
+. Resolve Emysql dependency via rebar.config if possible
+
+```Erlang
+{deps,
+[ {'emysql', ".*", { git, "git://github.com/Eonblast/Emysql.git",   "master" } } ]
+```
+or some other branch
+```Erlang
+{deps,
+[ {'emysql', ".*", { git, "git://github.com/jacktang/Emysql.git",   "taodi" } } ]
+```
+
 #### Starting an Application
 
 The Emysql driver is an Erlang gen-server, and, application.
