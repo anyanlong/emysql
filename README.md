@@ -284,7 +284,7 @@ or (after building emysql.app and the database, as explained above), start a_hel
 
 General Notes on using Emysql, including the actual specs:
 
-. Resolve Emysql dependency via rebar.config if possible
+#### Resolve Emysql dependency via rebar.config if possible
 
 ```Erlang
 {deps,
