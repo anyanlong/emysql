@@ -32,7 +32,7 @@
 find(ConnOrPool, [RawSql | Values]) ->
     case ConnOrPool of
         #emysql_connection{} = Conn ->
-            mysql_conn:execute(Conn, RawSql, Values);
+            emysql_conn:execute(Conn, RawSql, Values);
         Pool ->
             emysql:execute(Pool, RawSql, Values)
     end.
