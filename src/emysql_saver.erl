@@ -22,8 +22,12 @@
 %% Options = [{insert_ignore,  true},
 %%            {batch_size,     1000},
 %%            {update_attrs,   [data] }]
-%% emysql_saver:save(pool, test, ?INPUT(#test{data = "hello"}, Options)
-%% 
+%% emysql_saver:save(pool, test, ?INPUT(#test{data = "hello"}, Options).
+%%
+%% or
+%%
+%% emysql_saver:save(pool, test, ?INPUT(#test{data = "hello"})).
+%%
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
@@ -86,14 +90,18 @@ save(ConnOrPool, Table, [Records, Fields] = _RecordInput, Options) ->
 %%--------------------------------------------------------------------
 find_or_create_by(ConnOrPool, Table, FindSql, CreateFun) ->
     Result = emysql_query:find(ConnOrPool, FindSql),
-    [[Record], Fields] = CreateFun(),
-    case Result of
-        #result_packet{rows = Rows} when length(Rows) =:= 0 ->
-            save(ConnOrPool, Table, [[Record], Fields]);
-        #result_packet{} ->
-            emysql_conv:as_record(Result, element(1, Record), Fields);
-        Other ->
-            Other
+    case CreateFun() of
+        [[Record], Fields] ->
+            case Result of
+                #result_packet{rows = Rows} when length(Rows) =:= 0 ->
+                    save(ConnOrPool, Table, [[Record], Fields]);
+                #result_packet{} ->
+                    emysql_conv:as_record(Result, element(1, Record), Fields);
+                Other ->
+                    Other
+            end;
+        _ ->
+            io:format("Forget to wrap return value using ?INPUT?", [])
     end.
 
 %%%===================================================================
@@ -105,13 +113,11 @@ find_or_create_by(ConnOrPool, Table, FindSql, CreateFun) ->
 build_sql(_Table, [] = _Records, _Fields, _Options) ->
     {error, no_input};
 build_sql(Table, [Record | _Tail] = Records, Fields, Options) ->
-    BatchSize = proplists:get_value(batch_size, Options, 1000),
-                
     {UpdateFields, UpdateFIndex, UpdateVals} = select_update_fields_index(Record, Fields, Options),
     
     case element(2, Record) of
         undefined -> % insert
-            SqlAndValues = generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, BatchSize),
+            SqlAndValues = generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options),
             {insert, SqlAndValues};
         _ -> % update
             [PK | _] = Fields,
@@ -154,8 +160,14 @@ select_update_fields_index(Record, Fields, Options) ->
           end, {1, [], [], []}, Fields),
     {UpdateFields, UpdateFIndex, UpdateVals}.
 
-generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, BatchSize) ->
-    SqlHead  = "INSERT INTO " ++ type_utils:any_to_list(Table),
+generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options) ->
+    BatchSize = proplists:get_value(batch_size, Options, 1000),
+    SqlHead = case proplists:get_value(insert_ignore, Options, false) of
+                  true ->
+                      "INSERT IGNORE INTO " ++ type_utils:any_to_list(Table);
+                  _ ->
+                      "INSERT INTO " ++ type_utils:any_to_list(Table)
+              end,
     SqlFields = string:join(UpdateFields, ","),
     ValuesInSql = "(" ++ string:join(lists:duplicate(length(UpdateFields), "?"), ",") ++ ")",
             
