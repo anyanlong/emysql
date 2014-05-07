@@ -9,7 +9,7 @@
 -module(emysql_query).
 
 %% API
--export([find/2, find/4]).
+-export([find/2, find/3, find/4]).
 -export([find_first/4]).
 -export([find_each/5, find_each/6]).
 
@@ -39,32 +39,51 @@ find(ConnOrPool, [RawSql | Values]) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% e.g: find(my_pool, users, [ {select, [name, age]},
+%% e.g: find(my_pool, users, [ {select, ["name", "age"]},
 %%                             {where,  ["age > ?", Age]},
 %%                             {order,  "id desc"},
 %%                             {limit,  100 }], ?AS_REC(user))
 %% or
-%% find(my_pool, users, [ {select, [name, age]},
+%%
+%% find(my_pool, users, [ {select, ["name", "age"]},
 %%                        {where,  [{age, '>', Age}]},
 %%                        {order,  "id desc"},
 %%                        {limit,  100 }], ?AS_REC(user))
+%%
+%% or
+%%
+%% find(my_pool, users, [ {select, ["count(unique name)"]},
+%%                        {where,  [{age, '>', Age}]},
+%%                        {order,  "id desc"},
+%%                        {limit,  100 }], ?AS_VAL)
+%%
+%%
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-find(ConnOrPool, Table, SqlOptions, [Rec, RecFields] = _AsRec)  ->
+find(ConnOrPool, Table, SqlOptions) ->
     {FindSql, CondVals} = build_sql(Table, SqlOptions),
-    Result = case ConnOrPool of
-                 #emysql_connection{} = Conn ->
-                     emysql_conn:execute(Conn, FindSql, CondVals);
-                 Pool ->
-                     emysql:execute(Pool, FindSql, CondVals)
-             end,
+    case ConnOrPool of
+        #emysql_connection{} = Conn ->
+            emysql_conn:execute(Conn, FindSql, CondVals);
+        Pool ->
+            emysql:execute(Pool, FindSql, CondVals)
+    end.
+find(ConnOrPool, Table, SqlOptions, ?AS_VAL) ->
+    case find(ConnOrPool, Table, SqlOptions) of
+        #result_packet{rows = [[R] ]} -> R;
+        #result_packet{rows = [ Rs ]} -> Rs;
+        Other -> Other
+    end;
+    
+find(ConnOrPool, Table, SqlOptions, [Rec, RecFields] = _AsRec)  ->
+    Result = find(ConnOrPool, Table, SqlOptions),
     emysql_conv:as_record(Result, Rec, RecFields).
 
 
 %%--------------------------------------------------------------------
 %% @doc
-%% e.g: find(my_pool, users, [ {select, [name, age]},
+%% e.g: find(my_pool, users, [ {select, ["name", "age"]},
 %%                             {where,  ["age > ?", Age]},
 %%                             {order,  "id desc"} ], ?AS_REC(user))
 %%
@@ -96,7 +115,9 @@ find_each(ConnOrPool, Table, SqlOptions, AsRec, Fun) ->
 
 find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun) ->
     BaseId = 0,
-    {[FindSql, FindCondVals], [CountSql, CountCondVals]} = build_sql(Table, SqlOptions, BatchSize, BaseId),
+    
+    {[FindSql, FindCondVals],
+     [CountSql, CountCondVals]} = build_sql(Table, SqlOptions, BatchSize, BaseId),
     
     Result = case ConnOrPool of
                  #emysql_connection{} = Conn ->
@@ -125,8 +146,8 @@ find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun) ->
 %%% Internal functions
 %%%===================================================================
 build_sql(Table, SqlOptions) ->
-    {Ret, _} = build_sql(Table, SqlOptions, undefined, undefined),
-    Ret.
+    {[FindSql, FindCondVals], _} = build_sql(Table, SqlOptions, undefined, undefined),
+    {FindSql, FindCondVals}.
 
 build_sql(Table, SqlOptions, BatchSize, BaseId) ->
     SelectFields =
@@ -159,8 +180,8 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
                                                       {StmtAcc, ValAcc}
                                               end
                                       end, {[], []}, L),
-                                {string:join(Stmt, " AND "), Vals};
-                            [ Cond ]     -> {"WHERE " ++ Cond, [ ]};
+                                {"WHERE " ++ string:join(Stmt, " AND "), Vals};
+                            [ Cond ]        -> {"WHERE " ++ Cond, [ ]};
                             [Cond | Values] -> {"WHERE " ++ Cond, Values}
                         end,
     {Where2, CondVals2} =

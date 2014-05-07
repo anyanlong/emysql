@@ -182,6 +182,8 @@
 
 %  Wrap the query result in erlang record
 -define(AS_REC(Rec), [Rec, record_info(fields, Rec)]).
+-define(AS_VAL,      as_val).
+% 
 -define(INPUT(Records),  ((fun() ->
                                    case Records of
                                        undefined -> undefined;
@@ -190,4 +192,3 @@
                                        [Rec | _] ->
                                            [Records, record_info(fields, Rec)]
                                    end)()) ).
-
