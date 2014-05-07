@@ -43,7 +43,11 @@ find(ConnOrPool, [RawSql | Values]) ->
 %%                             {where,  ["age > ?", Age]},
 %%                             {order,  "id desc"},
 %%                             {limit,  100 }], ?AS_REC(user))
-%%
+%% or
+%% find(my_pool, users, [ {select, [name, age]},
+%%                        {where,  [{age, '>', Age}]},
+%%                        {order,  "id desc"},
+%%                        {limit,  100 }], ?AS_REC(user))
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
@@ -135,6 +139,27 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
     {Where, CondVals} = case proplists:get_value(where, SqlOptions) of
                             undefined -> {"", [ ]};
                             [ ]       -> {"", [ ]};
+                            [ Head | _T] = L when is_tuple(Head) ->
+                                {Stmt, Vals} =
+                                    lists:foldl(
+                                      fun(Item, {StmtAcc, ValAcc}) ->
+                                              case Item of
+                                                  {K, between, [V1, V2]} ->
+                                                      S = type_utils:any_to_list(K) ++ " BETWEEN ? AND ? ",
+                                                      {[S | StmtAcc], [V1, V2 | ValAcc]};
+                                                  {K, OP, V3} ->
+                                                      S = string:join([type_utils:any_to_list(K),
+                                                                       type_utils:any_to_list(OP),
+                                                                       "?"], " "),
+                                                      {[S | StmtAcc], [V3 | ValAcc] };
+                                                  {K, V4} ->
+                                                      S = type_utils:any_to_list(K) ++ " = ?",
+                                                      {[S | StmtAcc], [V4 | ValAcc]};
+                                                  _ ->
+                                                      {StmtAcc, ValAcc}
+                                              end
+                                      end, {[], []}, L),
+                                {string:join(Stmt, " AND "), Vals};
                             [ Cond ]     -> {"WHERE " ++ Cond, [ ]};
                             [Cond | Values] -> {"WHERE " ++ Cond, Values}
                         end,
