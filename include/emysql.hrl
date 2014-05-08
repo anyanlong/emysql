@@ -181,7 +181,7 @@
 -define(SERVER_STATUS_METADATA_CHANGED, 1024).
 
 %  Wrap the query result in erlang record
--define(AS_REC(RecAtom), [Rec, record_info(fields, RecAtom)]).
--define(AS_VAL,      as_val).
+-define(AS_REC(RecAtom), [RecAtom, record_info(fields, RecAtom)]).
+-define(AS_VAL,       as_val).
 % 
 -define(INPUT(RecAtom, Records), [Records, record_info(fields, RecAtom)]).
