@@ -191,4 +191,5 @@
                                            [Rec, record_info(fields, Rec)];
                                        [Rec | _] ->
                                            [Records, record_info(fields, Rec)]
-                                   end)()) ).
+                                   end
+                           end)()) ).
