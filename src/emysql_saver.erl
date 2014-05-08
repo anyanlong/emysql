@@ -35,17 +35,17 @@ save(_ConnOrPool, _Table, undefined) ->
     ok;
 save(_ConnOrPool, _Table, [[], _]) ->
     ok;
-save(_ConnOrPool, _Table, {error, Reason}) ->
-    {error, Reason};
 save(ConnOrPool, Table, RecordInput) ->
     DefOpt = [{auto_id,    true},
               {batch_size, 1000}],
     save(ConnOrPool, Table, RecordInput, DefOpt).
 
-save(_ConnOrPool, _Table, {error, Reason}, _Options) ->
-    {error, Reason};
-save(ConnOrPool, Table, [Records, Fields] = _RecordInput, Options) ->
+save(ConnOrPool, Table, [Record0, Fields] = _RecordInput, Options) ->
     [FieldPK | _ ] = Fields,
+    Records = case Record0 of
+                  V1 when is_list(V1) -> V1;
+                  V2                  -> [V2]
+              end,
     case build_sql(Table, Records, Fields, Options) of
         {insert, Sqls} ->
             X = lists:foldl(

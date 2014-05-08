@@ -181,20 +181,7 @@
 -define(SERVER_STATUS_METADATA_CHANGED, 1024).
 
 %  Wrap the query result in erlang record
--define(AS_REC(Rec), [Rec, record_info(fields, Rec)]).
+-define(AS_REC(RecAtom), [Rec, record_info(fields, RecAtom)]).
 -define(AS_VAL,      as_val).
 % 
--define(INPUT(Records),  ((fun() ->
-                                   case Records of
-                                       undefined -> {error, invalid_input};
-                                       Rec when is_tuple(Rec) ->
-                                           RecAtom = element(1, Rec),
-                                           [Rec, record_info(fields, RecAtom)];
-                                       [Rec | _] when is_tuple(Rec) ->
-                                           RecAtom = element(1, Rec),
-                                           [Records, record_info(fields, RecAtom)];
-                                       _ ->
-                                           io:format("Can't handle the input: ~p~n", [Records]),
-                                           {error, invalid_input}
-                                   end
-                           end)()) ).
+-define(INPUT(RecAtom, Records), [Records, record_info(fields, RecAtom)]).
