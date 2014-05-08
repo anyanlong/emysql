@@ -186,10 +186,15 @@
 % 
 -define(INPUT(Records),  ((fun() ->
                                    case Records of
-                                       undefined -> undefined;
-                                       Rec when is_record(Rec) ->
-                                           [Rec, record_info(fields, Rec)];
-                                       [Rec | _] ->
-                                           [Records, record_info(fields, Rec)]
+                                       undefined -> {error, invalid_input};
+                                       Rec when is_tuple(Rec) ->
+                                           RecAtom = element(1, Rec),
+                                           [Rec, record_info(fields, RecAtom)];
+                                       [Rec | _] when is_tuple(Rec) ->
+                                           RecAtom = element(1, Rec),
+                                           [Records, record_info(fields, RecAtom)];
+                                       _ ->
+                                           io:format("Can't handle the input: ~p~n", [Records]),
+                                           {error, invalid_input}
                                    end
                            end)()) ).

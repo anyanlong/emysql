@@ -35,11 +35,15 @@ save(_ConnOrPool, _Table, undefined) ->
     ok;
 save(_ConnOrPool, _Table, [[], _]) ->
     ok;
+save(_ConnOrPool, _Table, {error, Reason}) ->
+    {error, Reason};
 save(ConnOrPool, Table, RecordInput) ->
     DefOpt = [{auto_id,    true},
               {batch_size, 1000}],
     save(ConnOrPool, Table, RecordInput, DefOpt).
 
+save(_ConnOrPool, _Table, {error, Reason}, _Options) ->
+    {error, Reason};
 save(ConnOrPool, Table, [Records, Fields] = _RecordInput, Options) ->
     [FieldPK | _ ] = Fields,
     case build_sql(Table, Records, Fields, Options) of
