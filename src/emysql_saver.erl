@@ -172,7 +172,7 @@ generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options) ->
                   _ ->
                       "INSERT INTO " ++ type_utils:any_to_list(Table)
               end,
-    SqlFields = string:join(UpdateFields, ","),
+    SqlFields = string:join(lists:reverse(UpdateFields), ","),
     ValuesInSql = "(" ++ string:join(lists:duplicate(length(UpdateFields), "?"), ",") ++ ")",
             
     BatchCount = length(Records) div BatchSize,
@@ -199,7 +199,7 @@ generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options) ->
                                             lists:foldl(
                                               fun(Idx, AccIn2) ->
                                                       Val = element(Idx, RecItem),
-                                                      [Val | AccIn2]
+                                                      [Val | AccIn2] % That's why reverse SqlFields
                                               end, AccIn, UpdateFIndex)
                                     end, [], NRecords)    
                           end),
