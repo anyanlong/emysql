@@ -11,7 +11,8 @@
 %% API
 -export([save/3, save/4]).
 -export([find_or_create_by/4]).
--export([update_or_create_by/4]).
+-export([update_or_create_by/4,
+         update_or_create_by/5]).
 
 -include("emysql.hrl").
 %%%===================================================================
@@ -123,6 +124,9 @@ find_or_create_by(ConnOrPool, Table, FindSql, CreateFun) ->
 %% @end
 %%--------------------------------------------------------------------
 update_or_create_by(ConnOrPool, Table, FindSql, Fun) ->
+    update_or_create_by(ConnOrPool, Table, FindSql, Fun, []).
+        
+update_or_create_by(ConnOrPool, Table, FindSql, Fun, Options) ->
     Result = emysql_query:find(ConnOrPool, FindSql),
     case Fun() of
         [Record, Fields] ->
@@ -130,7 +134,13 @@ update_or_create_by(ConnOrPool, Table, FindSql, Fun) ->
                 #result_packet{rows = Rows} when length(Rows) =:= 0 ->
                     save(ConnOrPool, Table, [Record, Fields]);
                 #result_packet{} ->
-                    emysql_conv:as_record(Result, element(1, Record), Fields);
+                    RecInDb = emysql_conv:as_record(Result, element(1, Record), Fields),
+                    case merge_rec(RecInDb, Record, Fields, Options) of
+                        {changed, MergedRec} ->
+                            save(ConnOrPool, Table, [MergedRec, Fields]);
+                        _ ->
+                            RecInDb
+                    end;
                 Other ->
                     Other
             end;
@@ -146,8 +156,8 @@ update_or_create_by(ConnOrPool, Table, FindSql, Fun) ->
 %% update table set f1 = ?
 build_sql(_Table, [] = _Records, _Fields, _Options) ->
     {error, no_input};
+
 build_sql(Table, [Record | _Tail] = Records, Fields, Options) ->
-    
     case element(2, Record) of
         undefined -> % insert
             {UpdateFields, UpdateFIndex, _UVals} = select_update_fields_index(insert, Record,
@@ -265,3 +275,28 @@ generate_update_sql(Table, UpdateFields, UpdateVals, {FieldPK, PKVal}) ->
     Sql = string:join([SqlHead, "SET ", SqlSet, SqlTail], " "),
     
     {Sql, lists:append(UpdateVals, [PKVal])}.
+
+
+merge_rec(Rec1, Rec2, Fields, Options) ->
+    IgnoreNil = proplists:get_value(ignore_nil, Options, false),
+    [_, RecChanged, MergedRec] = 
+        lists:foldl(fun(Index, [Index, Changed, RecAcc]) ->
+                            Val1 = element(Index + 1, Rec1),
+                            Val2 = element(Index + 1, Rec2),
+                            case {Changed, IgnoreNil, Val1 =:= Val2, Val2} of
+                                {false, true, false, undefined} ->
+                                    [Index + 1, true, RecAcc];
+                                {false, true, false, _} ->
+                                    [Index + 1, true, setelement(Index + 1, RecAcc, Val2)];
+                                {false, _, true,  _} ->
+                                    [Index + 1, false, RecAcc];
+                                {true, true, true, _} ->
+                                    [Index + 1, true, RecAcc];
+                                {_, false, false, _} ->
+                                    [Index + 1, true, setelement(Index + 1, RecAcc, Val2)]
+                            end
+                    end, [1, false, Rec1], Fields),
+    case RecChanged of
+        true -> {changed,   MergedRec};
+        _    -> {unchanged, MergedRec}
+    end.
