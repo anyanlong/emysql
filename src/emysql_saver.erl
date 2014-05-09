@@ -11,6 +11,7 @@
 %% API
 -export([save/3, save/4]).
 -export([find_or_create_by/4]).
+-export([update_or_create_by/4]).
 
 -include("emysql.hrl").
 %%%===================================================================
@@ -84,10 +85,11 @@ save(ConnOrPool, Table, [Record0, Fields] = _RecordInput, Options) ->
 %%--------------------------------------------------------------------
 %% @doc
 %% 
-%% emysql_saver:find_or_create_by(pool, test, ["select * from test where data = ?", "hello"],
-%%                                            fun() ->
-%%                                                ?INPUT(#test{data = "find me"})
-%%                                            end)
+%% emysql_saver:find_or_create_by(pool, test,
+%%                                ["select * from test where data = ?", "hello"],
+%%                                fun() ->
+%%                                                ?INPUT(test, #test{data = "find me"})
+%%                                end)
 %% 
 %% @spec
 %% @end
@@ -95,10 +97,38 @@ save(ConnOrPool, Table, [Record0, Fields] = _RecordInput, Options) ->
 find_or_create_by(ConnOrPool, Table, FindSql, CreateFun) ->
     Result = emysql_query:find(ConnOrPool, FindSql),
     case CreateFun() of
-        [[Record], Fields] ->
+        [Record, Fields] ->
             case Result of
                 #result_packet{rows = Rows} when length(Rows) =:= 0 ->
-                    save(ConnOrPool, Table, [[Record], Fields]);
+                    save(ConnOrPool, Table, [Record, Fields]);
+                #result_packet{} ->
+                    emysql_conv:as_record(Result, element(1, Record), Fields);
+                Other ->
+                    Other
+            end;
+        _ ->
+            io:format("Forget to wrap return value using ?INPUT?", [])
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Options = [{ignore_null, true}]
+%% emysql_saver:update_or_create_by(pool, test,
+%%                                  ["select * from test where data = ?", "hello"],
+%%                                  fun() ->
+%%                                                ?INPUT(test, #test{data = "find me"})
+%%                                  end, Options)
+%% 
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+update_or_create_by(ConnOrPool, Table, FindSql, Fun) ->
+    Result = emysql_query:find(ConnOrPool, FindSql),
+    case Fun() of
+        [Record, Fields] ->
+            case Result of
+                #result_packet{rows = Rows} when length(Rows) =:= 0 ->
+                    save(ConnOrPool, Table, [Record, Fields]);
                 #result_packet{} ->
                     emysql_conv:as_record(Result, element(1, Record), Fields);
                 Other ->
@@ -117,20 +147,24 @@ find_or_create_by(ConnOrPool, Table, FindSql, CreateFun) ->
 build_sql(_Table, [] = _Records, _Fields, _Options) ->
     {error, no_input};
 build_sql(Table, [Record | _Tail] = Records, Fields, Options) ->
-    {UpdateFields, UpdateFIndex, UpdateVals} = select_update_fields_index(Record, Fields, Options),
     
     case element(2, Record) of
         undefined -> % insert
+            {UpdateFields, UpdateFIndex, _UVals} = select_update_fields_index(insert, Record,
+                                                                              Fields, Options),
+    
             SqlAndValues = generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options),
             {insert, SqlAndValues};
-        _ -> % update
+        _        -> % update
+            {UpdateFields, _FIndex, UpdateVals} = select_update_fields_index(update, Record,
+                                                                             Fields, Options),
             [PK | _] = Fields,
             PKPair = {type_utils:any_to_list(PK), element(2, Record)},
             SqlAndValues = generate_update_sql(Table, UpdateFields, UpdateVals, PKPair),
             {update, SqlAndValues}
     end.
 
-select_update_fields_index(Record, Fields, Options) ->
+select_update_fields_index(InsertOrUpdate, Record, Fields, Options) ->
     {UAOptIsSet, UpdateAttrs} =
         case proplists:get_value(update_attrs, Options) of
             undefined -> {no, []};
@@ -145,20 +179,30 @@ select_update_fields_index(Record, Fields, Options) ->
     {_, UpdateFields, UpdateFIndex, UpdateVals} =
         lists:foldl(
           fun(Field, {Index, EffectedFields, EffectedIndex, Vals}) ->
-                  case {Field, AutoId, UAOptIsSet, lists:member(Field, UpdateAttrs)} of
-                      {id, true, _, _} ->
+                  case {Field, AutoId, UAOptIsSet, InsertOrUpdate, lists:member(Field, UpdateAttrs)} of
+                      {id, true, _, _, _} ->
                           {Index + 1, EffectedFields, EffectedIndex, Vals};
-                      {_,  _,   no, _} ->
+                      {created_at, _, _, insert, _} ->
+                          NEffectedFields = [type_utils:any_to_list(Field) | EffectedFields],
+                          NEffectedIndex  = [(Index + 1) | EffectedIndex],
+                          Val = datetime_utils:localtime_as_string(),
+                          {Index + 1, NEffectedFields, NEffectedIndex, [Val | Vals]};
+                      {updated_at, _, _, _, _} ->
+                          NEffectedFields = [type_utils:any_to_list(Field) | EffectedFields],
+                          NEffectedIndex  = [(Index + 1) | EffectedIndex],
+                          Val = datetime_utils:localtime_as_string(),
+                          {Index + 1, NEffectedFields, NEffectedIndex, [Val | Vals]};
+                      {_,  _,   no, _, _} ->
                           NEffectedFields = [type_utils:any_to_list(Field) | EffectedFields],
                           NEffectedIndex  = [(Index + 1) | EffectedIndex],
                           Val = element(Index + 1, Record),
                           {Index + 1, NEffectedFields, NEffectedIndex, [Val | Vals]};
-                      {_,  _, yes, true} -> 
+                      {_,  _, yes, _, true} -> 
                           NEffectedFields = [type_utils:any_to_list(Field) | EffectedFields],
                           NEffectedIndex  = [(Index + 1) | EffectedIndex],
                           Val = element(Index + 1, Record),
                           {Index + 1, NEffectedFields, NEffectedIndex, [Val | Vals]};
-                      {_, _, yes, false} ->
+                      {_, _, yes, _, false} ->
                           {Index + 1, EffectedFields, EffectedIndex, Vals}
                   end
           end, {1, [], [], []}, Fields),
