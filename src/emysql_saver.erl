@@ -134,12 +134,18 @@ update_or_create_by(ConnOrPool, Table, FindSql, Fun, Options) ->
                 #result_packet{rows = Rows} when length(Rows) =:= 0 ->
                     save(ConnOrPool, Table, [Record, Fields]);
                 #result_packet{} ->
-                    RecInDb = emysql_conv:as_record(Result, element(1, Record), Fields),
-                    case merge_rec(RecInDb, Record, Fields, Options) of
-                        {changed, MergedRec} ->
-                            save(ConnOrPool, Table, [MergedRec, Fields]);
-                        _ ->
-                            RecInDb
+                    case emysql_conv:as_record(Result, element(1, Record), Fields) of
+                        [RecInDb] ->
+                            case merge_rec(RecInDb, Record, Fields, Options) of
+                                {changed, MergedRec} ->
+                                    save(ConnOrPool, Table, [MergedRec, Fields]);
+                                _ ->
+                                    RecInDb
+                            end;
+                        L ->
+                            io:format("Only one record expectedh here, but now there are ~p",
+                                      [length(L)]),
+                            throw({error, many_records})
                     end;
                 Other ->
                     Other
@@ -293,7 +299,9 @@ merge_rec(Rec1, Rec2, Fields, Options) ->
                                 {true, true, true, _} ->
                                     [Index + 1, true, RecAcc];
                                 {_, false, false, _} ->
-                                    [Index + 1, true, setelement(Index + 1, RecAcc, Val2)]
+                                    [Index + 1, true, setelement(Index + 1, RecAcc, Val2)];
+                                {true, false, true, _} ->
+                                    [Index + 1, true, RecAcc]
                             end
                     end, [1, false, Rec1], Fields),
     case RecChanged of
