@@ -280,7 +280,7 @@ generate_update_sql(Table, UpdateFields, UpdateVals, {FieldPK, PKVal}) ->
 merge_rec(Rec1, Rec2, Fields, Options) ->
     IgnoreNil = proplists:get_value(ignore_nil, Options, false),
     [_, RecChanged, MergedRec] = 
-        lists:foldl(fun(Index, [Index, Changed, RecAcc]) ->
+        lists:foldl(fun(_F, [Index, Changed, RecAcc]) ->
                             Val1 = element(Index + 1, Rec1),
                             Val2 = element(Index + 1, Rec2),
                             case {Changed, IgnoreNil, Val1 =:= Val2, Val2} of
