@@ -92,7 +92,10 @@ find(ConnOrPool, Table, SqlOptions, [Rec, RecFields] = _AsRec)  ->
 %%--------------------------------------------------------------------
 find_first(ConnOrPool, Table, SqlOptions, AsRec) ->
     NSqlOptions = proplists:delete(limit, SqlOptions),
-    find(ConnOrPool, Table, [{limit, 1} | NSqlOptions], AsRec).
+    case find(ConnOrPool, Table, [{limit, 1} | NSqlOptions], AsRec) of
+        [ ]   -> undefined;
+        [Val] -> Val
+    end.
 
 
 %%--------------------------------------------------------------------
