@@ -200,12 +200,12 @@ select_update_fields_index(InsertOrUpdate, Record, Fields, Options) ->
                           {Index + 1, EffectedFields, EffectedIndex, Vals};
                       {created_at, _, _, insert, _} ->
                           NEffectedFields = [type_utils:any_to_list(Field) | EffectedFields],
-                          NEffectedIndex  = [(Index + 1) | EffectedIndex],
+                          NEffectedIndex  = [ timestamp | EffectedIndex],
                           Val = datetime_utils:localtime_as_string(),
                           {Index + 1, NEffectedFields, NEffectedIndex, [Val | Vals]};
                       {updated_at, _, _, _, _} ->
                           NEffectedFields = [type_utils:any_to_list(Field) | EffectedFields],
-                          NEffectedIndex  = [(Index + 1) | EffectedIndex],
+                          NEffectedIndex  = [ timestamp | EffectedIndex],
                           Val = datetime_utils:localtime_as_string(),
                           {Index + 1, NEffectedFields, NEffectedIndex, [Val | Vals]};
                       {_,  _,   no, _, _} ->
@@ -258,7 +258,11 @@ generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options) ->
                                     fun(RecItem, AccIn) ->
                                             lists:foldl(
                                               fun(Idx, AccIn2) ->
-                                                      Val = element(Idx, RecItem),
+                                                      Val = case Idx of
+                                                                timestamp ->
+                                                                    datetime_utils:localtime_as_string();
+                                                                _ -> element(Idx, RecItem)
+                                                            end,
                                                       [Val | AccIn2] % That's why reverse SqlFields
                                               end, AccIn, UpdateFIndex)
                                     end, [], NRecords)    
