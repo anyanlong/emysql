@@ -203,6 +203,8 @@ select_update_fields_index(InsertOrUpdate, Record, Fields, Options) ->
                           NEffectedIndex  = [ timestamp | EffectedIndex],
                           Val = datetime_utils:localtime_as_string(),
                           {Index + 1, NEffectedFields, NEffectedIndex, [Val | Vals]};
+                      {created_at, _, _, update, _} ->
+                          {Index + 1, EffectedFields, EffectedIndex, Vals};
                       {updated_at, _, _, _, _} ->
                           NEffectedFields = [type_utils:any_to_list(Field) | EffectedFields],
                           NEffectedIndex  = [ timestamp | EffectedIndex],
