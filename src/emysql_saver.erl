@@ -75,12 +75,23 @@ save(ConnOrPool, Table, [Record0, Fields] = _RecordInput, Options) ->
                 [V] -> V
             end;
         {update, {Sql, Values} } ->
-             case ConnOrPool of
-                 #emysql_connection{} = Conn ->
-                     emysql_conn:execute(Conn, Sql, Values);
-                 Pool ->
-                     emysql:execute(Pool, Sql, Values)
-             end
+             Result = case ConnOrPool of
+                          #emysql_connection{} = Conn ->
+                              emysql_conn:execute(Conn, Sql, Values);
+                          Pool ->
+                              emysql:execute(Pool, Sql, Values)
+                      end,
+            case Result of
+                #ok_packet{affected_rows = Affected} ->
+                    case {Affected, length(Records)} of
+                        {1, 1} ->
+                            [Record] = Records,
+                            Record;
+                         _ -> Records
+                    end;
+                #error_packet{code = Code, msg = Msg} ->
+                    throw({Code, Msg})
+            end     
     end.
 
 %%--------------------------------------------------------------------
