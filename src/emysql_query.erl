@@ -72,8 +72,12 @@ find(ConnOrPool, Table, SqlOptions) ->
 find(ConnOrPool, Table, SqlOptions, ?AS_VAL) ->
     case find(ConnOrPool, Table, SqlOptions) of
         #result_packet{rows = [[R] ]} -> R;
-        #result_packet{rows = [ Rs ]} -> Rs;
-        Other -> Other
+        #result_packet{rows = Rs }    ->
+            lists:foldl(fun([R], AccIn) ->
+                                lists:append(AccIn, [R]) 
+                        end, [], Rs);
+        #error_packet{code = Code, msg = Msg} ->
+            throw({Code, Msg})
     end;
     
 find(ConnOrPool, Table, SqlOptions, [Rec, RecFields] = _AsRec)  ->
@@ -90,7 +94,11 @@ find(ConnOrPool, Table, SqlOptions, [Rec, RecFields] = _AsRec)  ->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-find_first(ConnOrPool, Table, SqlOptions, AsRec) ->
+find_first(ConnOrPool, Table, SqlOptions, ?AS_VAL) ->
+    NSqlOptions = proplists:delete(limit, SqlOptions),
+    find(ConnOrPool, Table, [{limit, 1} | NSqlOptions], ?AS_VAL);
+
+find_first(ConnOrPool, Table, SqlOptions, [_Rec, _RecFields] = AsRec) ->
     NSqlOptions = proplists:delete(limit, SqlOptions),
     case find(ConnOrPool, Table, [{limit, 1} | NSqlOptions], AsRec) of
         [ ]   -> undefined;
