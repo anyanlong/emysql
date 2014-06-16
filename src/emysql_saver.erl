@@ -114,7 +114,8 @@ find_or_create_by(ConnOrPool, Table, FindSql, CreateFun) ->
                 #result_packet{rows = Rows} when length(Rows) =:= 0 ->
                     save(ConnOrPool, Table, [Record, Fields]);
                 #result_packet{} ->
-                    emysql_conv:as_record(Result, element(1, Record), Fields);
+                    [R | _] = emysql_conv:as_record(Result, element(1, Record), Fields),
+                    R;
                 Other ->
                     Other
             end;
