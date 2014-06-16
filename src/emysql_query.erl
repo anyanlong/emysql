@@ -40,13 +40,13 @@ find(ConnOrPool, [RawSql | Values]) ->
 %%--------------------------------------------------------------------
 %% @doc
 %% e.g: find(my_pool, users, [ {select, ["name", "age"]},
-%%                             {where,  ["age > ?", Age]},
+%%                             {where,  ["age > ? AND color in (?)", Age, "blue, red"]},
 %%                             {order,  "id desc"},
 %%                             {limit,  100 }], ?AS_REC(user))
 %% or
 %%
 %% find(my_pool, users, [ {select, ["name", "age"]},
-%%                        {where,  [{age, '>', Age}]},
+%%                        {where,  [{age, '>', Age}, {color, in, ["blue", "red"]} ]},
 %%                        {order,  "id desc"},
 %%                        {limit,  100 }], ?AS_REC(user))
 %%
@@ -185,11 +185,15 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
                                                   {K, between, [V1, V2]} ->
                                                       S = type_utils:any_to_list(K) ++ " BETWEEN ? AND ? ",
                                                       {[S | StmtAcc], [V1, V2 | ValAcc]};
-                                                  {K, OP, V3} ->
+                                                  {K, in, V3} when is_list(V3) ->
+                                                      S = type_utils:any_to_list(K) ++ " IN (?) ",
+                                                      NV3 = string:join(V3, ", "), 
+                                                      {[S | StmtAcc], [NV3 | ValAcc]};
+                                                  {K, OP, V4} ->
                                                       S = string:join([type_utils:any_to_list(K),
                                                                        type_utils:any_to_list(OP),
                                                                        "?"], " "),
-                                                      {[S | StmtAcc], [V3 | ValAcc] };
+                                                      {[S | StmtAcc], [V4 | ValAcc] };
                                                   {K, V4} ->
                                                       S = type_utils:any_to_list(K) ++ " = ?",
                                                       {[S | StmtAcc], [V4 | ValAcc]};
@@ -250,18 +254,22 @@ do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, [Rec, RecFields] = AsR
     case Result of
         #result_packet{rows = Rows} ->
             Rs = emysql_conv:as_record(Result, Rec, RecFields, Fun),
-            NAccIn = case AccIn of
-                         L when is_list(L) -> lists:append(AccIn, Rs);
-                         _                 -> undefined
-                     end,
-            LastRow = lists_utils:last(Rows),
-            [NextId | _Tail] = LastRow,
-            case Remain - BatchSize > 0 of
-                true -> 
-                    do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, AsRec,
-                                 Fun, NAccIn, (Remain - BatchSize), NextId);
-                false ->
-                    NAccIn
+            case Rs of
+                [] -> AccIn;
+                _  ->
+                    NAccIn = case AccIn of
+                                 L when is_list(L) -> lists:append(AccIn, Rs);
+                                 _                 -> undefined
+                             end,
+                    LastRow = lists_utils:last(Rows),
+                    [NextId | _Tail] = LastRow,
+                    case Remain - BatchSize > 0 of
+                        true -> 
+                            do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, AsRec,
+                                         Fun, NAccIn, (Remain - BatchSize), NextId);
+                        false ->
+                            NAccIn
+                    end
             end;
         _ ->
             AccIn
