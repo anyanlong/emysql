@@ -282,13 +282,15 @@ generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options) ->
                                     end, [], NRecords)    
                           end),
     case BatchRemainSize of
-        0 -> [{Batch1Sql, lists:merge(RecBatchValues)}];
+        0 ->
+            [{Batch1Sql, FRecBatchValues} || FRecBatchValues <- lists:delete([], RecBatchValues)];
         _ ->
             {Batch1Values, Batch2Values} = lists:split(BatchCount, RecBatchValues),
             case Batch1Sql of
                 undefined -> [{Batch2Sql, lists:merge(Batch2Values)}];
-                _         -> [{Batch1Sql, lists:merge(Batch1Values)},
-                              {Batch2Sql, lists:merge(Batch2Values)}]
+                _         ->
+                    lists:merge([{Batch1Sql, FBatch1Values} || FBatch1Values <- Batch1Values],
+                                [{Batch2Sql, lists:merge(Batch2Values)}])
             end
     end.
 
