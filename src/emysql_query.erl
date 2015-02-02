@@ -12,7 +12,7 @@
 -export([find/2, find/3, find/4]).
 -export([find_first/4]).
 -export([find_each/4, find_each/5, find_each/6]).
-
+-export([foldl/5, foldl/6, foldl/7]).
 
 -include("emysql.hrl").
 
@@ -105,6 +105,29 @@ find_first(ConnOrPool, Table, SqlOptions, [_Rec, _RecFields] = AsRec) ->
         [Val] -> Val
     end.
 
+%%--------------------------------------------------------------------
+%% @doc
+%%
+%% e.g:
+%%      Fun = fun(#user{} = U, FunState) ->
+%%                {R, NFunState} = do_something_to(U, FunState)
+%%            end,
+%%      find(my_pool, users, [ {select, ["name", "age"]},
+%%                             {where,  ["age > ?", Age]},
+%%                             {order,  "id desc"},
+%%                             {limit,  100 }            ], 10, ?AS_REC(user), Fun, FunState)
+%%
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+foldl(ConnOrPool, Table, AsRec, Fun, FunState) ->
+    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, FunState, undefined).
+
+foldl(ConnOrPool, Table, AsRec, Fun, FunState, AccIn) ->
+    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, FunState, AccIn).
+
+foldl(ConnOrPool, Table, SqlOptions, AsRec, Fun, FunState, AccIn) ->
+    find_each(ConnOrPool, Table, SqlOptions, 1000, AsRec, Fun, FunState, AccIn).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -122,20 +145,20 @@ find_first(ConnOrPool, Table, SqlOptions, [_Rec, _RecFields] = AsRec) ->
 %% @end
 %%--------------------------------------------------------------------
 find_each(ConnOrPool, Table, AsRec, Fun) ->
-    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, undefined).
+    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, undefined, undefined).
 
 find_each(ConnOrPool, Table, AsRec, Fun, AccIn) ->
-    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, AccIn).
+    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, undefined, AccIn).
 
 find_each(ConnOrPool, Table, SqlOptions, AsRec, Fun, AccIn) ->
-    find_each(ConnOrPool, Table, SqlOptions, 1000, AsRec, Fun, AccIn).
+    find_each(ConnOrPool, Table, SqlOptions, 1000, AsRec, Fun, undefined, AccIn).
 
-find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun, AccIn) ->
+find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun, FunState, AccIn) ->
     BaseId = 0,
-    
+
     {[FindSql, FindCondVals],
      [CountSql, CountCondVals]} = build_sql(Table, SqlOptions, BatchSize, BaseId),
-    
+
     Result = case ConnOrPool of
                  #emysql_connection{} = Conn ->
                      emysql_conn:execute(Conn, CountSql, CountCondVals);
@@ -151,7 +174,7 @@ find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun, AccIn) ->
                          {_,     false}  -> Total
                      end,
             do_find_each(ConnOrPool, Table, FindSql, FindCondVals, BatchSize,
-                         AsRec, Fun, AccIn, Remain, BaseId);
+                         AsRec, Fun, FunState, AccIn, Remain, BaseId);
         #error_packet{code = Code, msg = Msg} ->
             throw({Code, Msg});
         _ ->
@@ -242,7 +265,7 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
 
 
 do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, [Rec, RecFields] = AsRec,
-             Fun, AccIn, Remain, BaseId) ->
+             Fun, FunState, AccIn, Remain, BaseId) ->
     NCondVals = lists:append(lists_utils:droplast(CondVals), [BaseId]),
     
     Result = case ConnOrPool of
@@ -253,7 +276,7 @@ do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, [Rec, RecFields] = AsR
              end,
     case Result of
         #result_packet{rows = Rows} ->
-            Rs = emysql_conv:as_record(Result, Rec, RecFields, Fun),
+            Rs = emysql_conv:as_record(Result, Rec, RecFields, Fun, FunState),
             case Rs of
                 [] -> AccIn;
                 _  ->
@@ -264,9 +287,9 @@ do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, [Rec, RecFields] = AsR
                     LastRow = lists_utils:last(Rows),
                     [NextId | _Tail] = LastRow,
                     case Remain - BatchSize > 0 of
-                        true -> 
+                        true ->
                             do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, AsRec,
-                                         Fun, NAccIn, (Remain - BatchSize), NextId);
+                                         Fun, FunState, NAccIn, (Remain - BatchSize), NextId);
                         false ->
                             NAccIn
                     end

@@ -11,7 +11,8 @@
          as_json/1,
          as_proplist/1,
          as_record/3,
-         as_record/4
+         as_record/4,
+         as_record/5
 ]).
 
 %% @see emysql:as_dict/1
@@ -36,7 +37,7 @@ as_proplist(Res = #result_packet{field_list=Cols,rows=Rows}) when is_list(Cols),
     end || R <- Rows].
 
 %% @see emysql:as_record/1
-as_record(Result = #result_packet{}, RecordName, Fields, Fun) when is_atom(RecordName), is_list(Fields), is_function(Fun) ->
+as_record(Result = #result_packet{}, RecordName, Fields, Fun, FunState) when is_atom(RecordName), is_list(Fields), is_function(Fun) ->
     Columns = Result#result_packet.field_list,
 
     S = lists:seq(1, length(Columns)),
@@ -50,11 +51,26 @@ as_record(Result = #result_packet{}, RecordName, Fields, Fun) when is_atom(Recor
         end
     end,
     Fs = [ F(FieldName) || FieldName <- Fields ],
-    F1 = fun(Row) ->
-        RecordData = [ Fx(Row) || Fx <- Fs ],
-        Fun(list_to_tuple([RecordName|RecordData]))
-    end,
-    [ F1(Row) || Row <- Result#result_packet.rows ].
+
+    case FunState of
+        undefined ->
+            lists:foldl(
+                fun(Row, RAcc) ->
+                    RecordData = [ Fx(Row) || Fx <- Fs ],
+                    R = Fun(list_to_tuple([RecordName|RecordData])),
+                    [R | RAcc]
+                end, [], Result#result_packet.rows);
+        _ ->
+            lists:foldl(
+                fun(Row, {RAcc, FAcc}) ->
+                    RecordData = [ Fx(Row) || Fx <- Fs ],
+                    {R, NFAcc} = Fun(list_to_tuple([RecordName|RecordData]), FAcc),
+                    {[R | RAcc], NFAcc}
+                end, {[], FunState}, Result#result_packet.rows)
+    end.
+
+as_record(Result = #result_packet{}, RecordName, Fields, Fun) when is_atom(RecordName), is_list(Fields), is_function(Fun) ->
+    as_record(Result, RecordName, Fields, fun(A) -> A end, undefined).
 
 as_record(Result = #result_packet{}, RecordName, Fields) when is_atom(RecordName), is_list(Fields) ->
     as_record(Result, RecordName, Fields, fun(A) -> A end).
