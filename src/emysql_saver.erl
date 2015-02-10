@@ -28,6 +28,9 @@
 %%
 %% or
 %%
+%%
+%% or
+%%
 %% emysql_saver:save(pool, test, ?INPUT(#test{data = "hello"})).
 %%
 %% @spec
@@ -281,9 +284,21 @@ generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options) ->
                                               end, AccIn, UpdateFIndex)
                                     end, [], NRecords)    
                           end),
+    %case BatchRemainSize of
+    %    0 -> [{Batch1Sql, lists:merge(RecBatchValues)}];
+    %    _ ->
+    %        {Batch1Values, Batch2Values} = lists:split(BatchCount, RecBatchValues),
+    %        case Batch1Sql of
+    %            undefined -> [{Batch2Sql, lists:merge(Batch2Values)}];
+    %            _         -> [{Batch1Sql, lists:merge(Batch1Values)},
+    %                          {Batch2Sql, lists:merge(Batch2Values)}]
+    %        end
+    %end.
     case BatchRemainSize of
         0 ->
-            [{Batch1Sql, FRecBatchValues} || FRecBatchValues <- lists:delete([], RecBatchValues)];
+            % 当保存条数整除1000时，lists RecBatchValues最后的元素为[],要删除掉
+            [{Batch1Sql, FRecBatchValues} || FRecBatchValues <- lists:delete([], RecBatchValues)];  
+
         _ ->
             {Batch1Values, Batch2Values} = lists:split(BatchCount, RecBatchValues),
             case Batch1Sql of
@@ -302,6 +317,7 @@ generate_update_sql(Table, UpdateFields, UpdateVals, {FieldPK, PKVal}) ->
     
     {Sql, lists:append(UpdateVals, [PKVal])}.
 
+%generate_update_sql(Table, UpdateFields, UpdateVals, )
 
 merge_rec(Rec1, Rec2, Fields, Options) ->
     IgnoreNil = proplists:get_value(ignore_nil, Options, false),

@@ -12,7 +12,6 @@
 -export([find/2, find/3, find/4]).
 -export([find_first/4]).
 -export([find_each/4, find_each/5, find_each/6]).
--export([foldl/5, foldl/6, foldl/7]).
 
 -include("emysql.hrl").
 
@@ -105,29 +104,6 @@ find_first(ConnOrPool, Table, SqlOptions, [_Rec, _RecFields] = AsRec) ->
         [Val] -> Val
     end.
 
-%%--------------------------------------------------------------------
-%% @doc
-%%
-%% e.g:
-%%      Fun = fun(#user{} = U, FunState) ->
-%%                {R, NFunState} = do_something_to(U, FunState)
-%%            end,
-%%      find(my_pool, users, [ {select, ["name", "age"]},
-%%                             {where,  ["age > ?", Age]},
-%%                             {order,  "id desc"},
-%%                             {limit,  100 }            ], 10, ?AS_REC(user), Fun, FunState)
-%%
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-foldl(ConnOrPool, Table, AsRec, Fun, FunState) ->
-    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, FunState, undefined).
-
-foldl(ConnOrPool, Table, AsRec, Fun, FunState, AccIn) ->
-    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, FunState, AccIn).
-
-foldl(ConnOrPool, Table, SqlOptions, AsRec, Fun, FunState, AccIn) ->
-    find_each(ConnOrPool, Table, SqlOptions, 1000, AsRec, Fun, FunState, AccIn).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -136,29 +112,33 @@ foldl(ConnOrPool, Table, SqlOptions, AsRec, Fun, FunState, AccIn) ->
 %%      Fun = fun(#user{} = U) ->
 %%                do_something_to(U)
 %%            end,
-%%      find(my_pool, users, [ {select, ["name", "age"]},
-%%                             {where,  ["age > ?", Age]},
-%%                             {order,  "id desc"},
-%%                             {limit,  100 }            ], 10, ?AS_REC(user), Fun)
+%%      find_each(my_pool, users, ?AS_REC(user), Fun).
+%%
+%%      find_each(my_pool, users, [ {select, ["name", "age"]},
+%%                                  {where,  ["age > ?", Age]},
+%%                                  % {order,  "id desc"},
+%%                                  {order, [id, "DESC"] },
+%%                                  {limit,  100 }            ], 10, ?AS_REC(user), Fun).
 %%
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
 find_each(ConnOrPool, Table, AsRec, Fun) ->
-    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, undefined, undefined).
+    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, undefined).
 
 find_each(ConnOrPool, Table, AsRec, Fun, AccIn) ->
-    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, undefined, AccIn).
+    find_each(ConnOrPool, Table, [], 1000, AsRec, Fun, AccIn).
 
 find_each(ConnOrPool, Table, SqlOptions, AsRec, Fun, AccIn) ->
-    find_each(ConnOrPool, Table, SqlOptions, 1000, AsRec, Fun, undefined, AccIn).
+    find_each(ConnOrPool, Table, SqlOptions, 1000, AsRec, Fun, AccIn).
 
-find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun, FunState, AccIn) ->
-    BaseId = 0,
-
+find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun, AccIn) ->
+    BaseId = undefined,
+    
     {[FindSql, FindCondVals],
-     [CountSql, CountCondVals]} = build_sql(Table, SqlOptions, BatchSize, BaseId),
-
+     [CountSql, CountCondVals],
+     [OField, OSort]} = build_sql(Table, SqlOptions, BatchSize, BaseId),
+    
     Result = case ConnOrPool of
                  #emysql_connection{} = Conn ->
                      emysql_conn:execute(Conn, CountSql, CountCondVals);
@@ -173,8 +153,13 @@ find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun, FunState, AccIn)
                          {_,      true}  -> Limit;
                          {_,     false}  -> Total
                      end,
-            do_find_each(ConnOrPool, Table, FindSql, FindCondVals, BatchSize,
-                         AsRec, Fun, FunState, AccIn, Remain, BaseId);
+            %BaseId = case OSort of
+            %             "ASC"  -> 0;
+            %             "DESC" -> infinite
+            %         end,
+            %do_find_each(ConnOrPool, Table, FindSql, FindCondVals, BatchSize,
+            %             AsRec, Fun, AccIn, Remain, BaseId);
+            do_find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun, AccIn, Remain, BaseId);
         #error_packet{code = Code, msg = Msg} ->
             throw({Code, Msg});
         _ ->
@@ -228,21 +213,29 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
                             [ Cond ]        -> {"WHERE " ++ Cond, [ ]};
                             [Cond | Values] -> {"WHERE " ++ Cond, Values}
                         end,
-    {Where2, CondVals2} =
-        case {BaseId, Where} of
-            {undefined, _} -> {Where, CondVals};
-            {_,        ""} -> {"WHERE id > ?", [BaseId]};
-            _              ->
-                {Where ++ "AND id > ?", lists:append(CondVals, [BaseId])}
+    
+    [Order, OField, OSort] =
+        case proplists:get_value(order, SqlOptions) of
+            undefined -> ["", id, "ASC"];
+            [OrderField, OrderSort]   ->
+                ["ORDER BY " ++ type_utils:any_to_list(OrderField) ++ " " ++ type_utils:any_to_list(OrderSort),
+                 OrderField, OrderSort]
         end,
     
-        
-    Order = case proplists:get_value(order, SqlOptions) of
-                undefined -> "";
-                OrderBy   -> "ORDER BY " ++ type_utils:any_to_list(OrderBy)
-            end,
-
-
+    {Where2, CondVals2} =
+        case {BaseId, OSort, Where} of
+            {infinate,  _,  _} -> {Where, CondVals};
+            {undefined, _,  _} -> {Where, CondVals};
+            {_,  "ASC",  ""} -> {"WHERE " ++ type_utils:any_to_list(OField) ++ " > ?", [BaseId]};
+            {_,  "DESC", ""} -> {"WHERE " ++ type_utils:any_to_list(OField) ++ " < ?", [BaseId]};
+            {_,  "ASC",   _} ->
+                 {Where ++ " AND " ++ type_utils:any_to_list(OField) ++ " > ?",
+                  lists:append(CondVals, [BaseId])};
+            {_,  "DESC", _ } ->
+                {Where ++ " AND " ++ type_utils:any_to_list(OField) ++ " < ?",
+                 lists:append(CondVals, [BaseId])}
+        end,
+         
     Limit = 
         case BatchSize of
             undefined -> 
@@ -255,43 +248,52 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
             _ ->
                 "LIMIT " ++ type_utils:any_to_list(BatchSize)
         end,
-        
 
     Table2 = type_utils:any_to_list(Table),
     FindSql  = string:join(["SELECT", SelectFields, "FROM", Table2, Where2, Order, Limit], " "),
     CountSql = string:join(["SELECT COUNT(1) FROM", Table2, Where], " "),
-    {[FindSql, CondVals2], [CountSql, CondVals]}.
+    {[FindSql, CondVals2], [CountSql, CondVals], [OField, OSort]}.
 
 
+do_find_each(ConnOrPool, Table, SqlOptions, BatchSize, [Rec, RecFields] = AsRec,
+             Fun, AccIn, Remain, BaseId) ->
+    {[Sql, CondVals],
+     [_CountSql, _CountCondVals],
+     [OrderField, _OSort]} = build_sql(Table, SqlOptions, BatchSize, BaseId),
+    do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, AsRec, Fun, AccIn, Remain, OrderField, BaseId).
 
 do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, [Rec, RecFields] = AsRec,
-             Fun, FunState, AccIn, Remain, BaseId) ->
-    NCondVals = lists:append(lists_utils:droplast(CondVals), [BaseId]),
+             Fun, AccIn, Remain, OrderField, BaseId) ->
     
     Result = case ConnOrPool of
                  #emysql_connection{} = Conn ->
-                     emysql_conn:execute(Conn, Sql, NCondVals);
+                     emysql_conn:execute(Conn, Sql, CondVals);
                  Pool ->
-                     emysql:execute(Pool, Sql, NCondVals)
+                     emysql:execute(Pool, Sql, CondVals)
              end,
     case Result of
         #result_packet{rows = Rows} ->
-            Rs = emysql_conv:as_record(Result, Rec, RecFields, Fun, FunState),
-            case Rs of
-                [] -> AccIn;
-                _  ->
-                    NAccIn = case AccIn of
-                                 L when is_list(L) -> lists:append(AccIn, Rs);
-                                 _                 -> undefined
-                             end,
-                    LastRow = lists_utils:last(Rows),
-                    [NextId | _Tail] = LastRow,
+            case emysql_conv:as_record(Result, Rec, RecFields, Fun, AccIn) of
+                {[], NAccIn}  -> NAccIn;
+                {Rs, NAccIn}  ->
+                    LastRow = lists_utils:last(Rs),
+                    NextId = tuple_utils:value(OrderField, LastRow, RecFields),
                     case Remain - BatchSize > 0 of
                         true ->
                             do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, AsRec,
-                                         Fun, FunState, NAccIn, (Remain - BatchSize), NextId);
+                                         Fun, NAccIn, (Remain - BatchSize), OrderField, NextId);
                         false ->
                             NAccIn
+                    end;
+                Rs when is_list(Rs)  ->
+                    LastRow = lists_utils:last(Rs),
+                    NextId = tuple_utils:value(OrderField, LastRow, RecFields),
+                    case Remain - BatchSize > 0 of
+                        true ->
+                            do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, AsRec,
+                                         Fun, undefined, (Remain - BatchSize), OrderField, NextId);
+                        false ->
+                            ok
                     end
             end;
         _ ->
