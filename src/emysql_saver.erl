@@ -28,6 +28,10 @@
 %%
 %% or
 %%
+%% Options = [{insert_ignore,  true},
+%%            {batch_size,     1000},
+%%            {unique_fields,  [out_id, login] } ]
+%% emysql_saver:save(pool, test, ?INPUT(#test{data = "hello"}, Options).
 %%
 %% or
 %%
@@ -255,19 +259,43 @@ generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options) ->
     BatchCount = length(Records) div BatchSize,
     BatchRemainSize = length(Records) rem BatchSize,
 
+    UniqueFields = proplists:get_value(unique_fields, Options, []),
+    
     Batch1Sql = case BatchCount of
                     0    -> undefined;
                     _    ->
                         SqlValues1 = string:join(lists:duplicate(BatchSize, ValuesInSql), ","),
-                        string:join([SqlHead, "(", SqlFields, ") VALUES ", SqlValues1], " ")
+                        Sql1 = string:join([SqlHead, "(", SqlFields, ") VALUES ", SqlValues1], " "),
+                        case UniqueFields of
+                            [] -> Sql1;
+                            Fs1 when is_list(Fs1) ->
+                                OnDupSubSql1 = lists:foldl(
+                                                fun(UniqueField, OnDupAcc) ->
+                                                        UFieldStr = type_utils:any_to_list(UniqueField),
+                                                        lists:append(UFieldStr ++ "= VALUES(" ++ UFieldStr ++ ")", OnDupAcc)
+                                                end, [], UniqueFields),
+                                Sql1 ++ " ON DUPLICATE KEY UPDATE " ++ string:join(OnDupSubSql1, ", ");
+                            _ -> Sql1
+                        end
                 end,
     Batch2Sql = case BatchRemainSize of
                     0    -> undefined;
                     _    ->
                         SqlValues2 = string:join(lists:duplicate(BatchRemainSize, ValuesInSql), ","),
-                        string:join([SqlHead, "(", SqlFields, ") VALUES ", SqlValues2], " ")
+                        Sql2 = string:join([SqlHead, "(", SqlFields, ") VALUES ", SqlValues2], " "),
+                        case UniqueFields of
+                            [] -> Sql2;
+                            Fs2 when is_list(Fs2) ->
+                                OnDupSubSql2 = lists:foldl(
+                                                fun(UniqueField, OnDupAcc) ->
+                                                        UFieldStr = type_utils:any_to_list(UniqueField),
+                                                        lists:append(UFieldStr ++ "= VALUES(" ++ UFieldStr ++ ")", OnDupAcc)
+                                                end, [], UniqueFields),
+                                Sql2 ++ " ON DUPLICATE KEY UPDATE " ++ string:join(OnDupSubSql2, ", ");
+                            _ -> Sql2
+                        end
                 end,   
-                                
+
     RecBatchValues =
         lists_utils:split(BatchSize, Records,
                           fun(NRecords) ->
@@ -284,16 +312,7 @@ generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options) ->
                                               end, AccIn, UpdateFIndex)
                                     end, [], NRecords)    
                           end),
-    %case BatchRemainSize of
-    %    0 -> [{Batch1Sql, lists:merge(RecBatchValues)}];
-    %    _ ->
-    %        {Batch1Values, Batch2Values} = lists:split(BatchCount, RecBatchValues),
-    %        case Batch1Sql of
-    %            undefined -> [{Batch2Sql, lists:merge(Batch2Values)}];
-    %            _         -> [{Batch1Sql, lists:merge(Batch1Values)},
-    %                          {Batch2Sql, lists:merge(Batch2Values)}]
-    %        end
-    %end.
+
     case BatchRemainSize of
         0 ->
             % 当保存条数整除1000时，lists RecBatchValues最后的元素为[],要删除掉
@@ -316,8 +335,6 @@ generate_update_sql(Table, UpdateFields, UpdateVals, {FieldPK, PKVal}) ->
     Sql = string:join([SqlHead, "SET ", SqlSet, SqlTail], " "),
     
     {Sql, lists:append(UpdateVals, [PKVal])}.
-
-%generate_update_sql(Table, UpdateFields, UpdateVals, )
 
 merge_rec(Rec1, Rec2, Fields, Options) ->
     IgnoreNil = proplists:get_value(ignore_nil, Options, false),
