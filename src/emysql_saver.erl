@@ -272,7 +272,7 @@ generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options) ->
                                 OnDupSubSql1 = lists:foldl(
                                                 fun(UniqueField, OnDupAcc) ->
                                                         UFieldStr = type_utils:any_to_list(UniqueField),
-                                                        lists:append(UFieldStr ++ "= VALUES(" ++ UFieldStr ++ ")", OnDupAcc)
+                                                        lists:append(OnDupAcc, [UFieldStr ++ "= VALUES(" ++ UFieldStr ++ ")"])
                                                 end, [], UniqueFields),
                                 Sql1 ++ " ON DUPLICATE KEY UPDATE " ++ string:join(OnDupSubSql1, ", ");
                             _ -> Sql1
@@ -289,7 +289,7 @@ generate_insert_sql(Table, UpdateFields, UpdateFIndex, Records, Options) ->
                                 OnDupSubSql2 = lists:foldl(
                                                 fun(UniqueField, OnDupAcc) ->
                                                         UFieldStr = type_utils:any_to_list(UniqueField),
-                                                        lists:append(UFieldStr ++ "= VALUES(" ++ UFieldStr ++ ")", OnDupAcc)
+                                                        lists:append(OnDupAcc, [UFieldStr ++ "= VALUES(" ++ UFieldStr ++ ")"])
                                                 end, [], UniqueFields),
                                 Sql2 ++ " ON DUPLICATE KEY UPDATE " ++ string:join(OnDupSubSql2, ", ");
                             _ -> Sql2

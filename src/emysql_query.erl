@@ -171,7 +171,7 @@ find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun, AccIn) ->
 %%% Internal functions
 %%%===================================================================
 build_sql(Table, SqlOptions) ->
-    {[FindSql, FindCondVals], _} = build_sql(Table, SqlOptions, undefined, undefined),
+    {[FindSql, FindCondVals], _, _} = build_sql(Table, SqlOptions, undefined, undefined),
     {FindSql, FindCondVals}.
 
 build_sql(Table, SqlOptions, BatchSize, BaseId) ->
@@ -218,8 +218,17 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
         case proplists:get_value(order, SqlOptions) of
             undefined -> ["", id, "ASC"];
             [OrderField, OrderSort]   ->
-                ["ORDER BY " ++ type_utils:any_to_list(OrderField) ++ " " ++ type_utils:any_to_list(OrderSort),
-                 OrderField, OrderSort]
+                OrderStr1 = "ORDER BY " ++ type_utils:any_to_list(OrderField) ++ " " ++ type_utils:any_to_list(OrderSort),
+                [OrderStr1, OrderField, OrderSort];
+            [[OrderField, OrderSort] | _] = OrderOpt ->
+                MultiOrder = lists:foldl(fun([OField0, OSort0], OAcc) ->
+                                                 lists:append(OAcc, [type_utils:any_to_list(OField0) ++ " " ++ type_utils:any_to_list(OSort0)])
+                                         end, [], OrderOpt),
+                OrderStr2 = "ORDER BY " ++ string:join(MultiOrder, ", "),
+                [OrderStr2, OrderField, OrderSort]; %% TODO: should return multi-order
+            OrderBy ->
+                OrderStr3 = "ORDER BY " ++ type_utils:any_to_list(OrderBy),
+                [OrderStr3, undefined, undefined]
         end,
     
     {Where2, CondVals2} =
@@ -260,7 +269,12 @@ do_find_each(ConnOrPool, Table, SqlOptions, BatchSize, [Rec, RecFields] = AsRec,
     {[Sql, CondVals],
      [_CountSql, _CountCondVals],
      [OrderField, _OSort]} = build_sql(Table, SqlOptions, BatchSize, BaseId),
-    do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, AsRec, Fun, AccIn, Remain, OrderField, BaseId).
+    case OrderField of
+        undefined ->
+            throw(order_field_is_undefined);
+        _ ->
+            do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, AsRec, Fun, AccIn, Remain, OrderField, BaseId)
+    end.
 
 do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, [Rec, RecFields] = AsRec,
              Fun, AccIn, Remain, OrderField, BaseId) ->
