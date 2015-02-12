@@ -28,7 +28,7 @@ as_proplist(#result_packet{field_list=_Cols,rows=_Rows}) when is_list(_Cols),
 as_proplist(#result_packet{field_list=_Cols,rows=_Rows}) when is_list(_Cols),
                                                               _Rows =:= [] ->
     [];
-as_proplist(Res = #result_packet{field_list=Cols,rows=Rows}) when is_list(Cols),
+as_proplist(#result_packet{field_list=Cols,rows=Rows} = Res) when is_list(Cols),
                                                                   is_list(Rows) ->
     Fields = emysql:field_names(Res),
     [begin
@@ -36,7 +36,7 @@ as_proplist(Res = #result_packet{field_list=Cols,rows=Rows}) when is_list(Cols),
     end || R <- Rows].
 
 %% @see emysql:as_record/1
-as_record(Result = #result_packet{}, RecordName, Fields, Fun, AccIn) when is_atom(RecordName), is_list(Fields), is_function(Fun) ->
+as_record(#result_packet{} = Result, RecordName, Fields, Fun, AccIn) when is_atom(RecordName), is_list(Fields), is_function(Fun) ->
     Columns = Result#result_packet.field_list,
 
     S = lists:seq(1, length(Columns)),
@@ -55,7 +55,7 @@ as_record(Result = #result_packet{}, RecordName, Fields, Fun, AccIn) when is_ato
         undefined ->
             F1 = fun(Row) ->
                          RecordData = [ Fx(Row) || Fx <- Fs ],
-                         Fun(list_to_tuple([RecordName|RecordData]), AccIn)
+                         Fun(list_to_tuple([RecordName|RecordData]))
                  end,
             [ F1(Row) || Row <- Result#result_packet.rows ];
         _ ->
@@ -67,11 +67,11 @@ as_record(Result = #result_packet{}, RecordName, Fields, Fun, AccIn) when is_ato
                         end, {[], AccIn}, Result#result_packet.rows)
     end.
 
-as_record(Result = #result_packet{}, RecordName, Fields, Fun) when is_atom(RecordName), is_list(Fields), is_function(Fun) ->
-    as_record(Result = #result_packet{}, RecordName, Fields, Fun, undefined).
+as_record(#result_packet{} = Result, RecordName, Fields, Fun) when is_atom(RecordName), is_list(Fields), is_function(Fun) ->
+    as_record(Result, RecordName, Fields, Fun, undefined).
 
 
-as_record(Result = #result_packet{}, RecordName, Fields) when is_atom(RecordName), is_list(Fields) ->
+as_record(#result_packet{} = Result, RecordName, Fields) when is_atom(RecordName), is_list(Fields) ->
     as_record(Result, RecordName, Fields, fun(A) -> A end).
 
 %% @see emysql:as_json/1
