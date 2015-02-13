@@ -11,6 +11,7 @@
          as_json/1,
          as_proplist/1,
          as_record/3,
+         as_record/5,
          as_record/4
 ]).
 
