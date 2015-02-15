@@ -273,45 +273,46 @@ do_find_each(ConnOrPool, Table, SqlOptions, BatchSize, [Rec, RecFields] = AsRec,
         undefined ->
             throw(order_field_is_undefined);
         _ ->
-            do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, AsRec, Fun, AccIn, Remain, OrderField, BaseId)
-    end.
-
-do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, [Rec, RecFields] = AsRec,
-             Fun, AccIn, Remain, OrderField, BaseId) ->
-    
-    Result = case ConnOrPool of
-                 #emysql_connection{} = Conn ->
-                     emysql_conn:execute(Conn, Sql, CondVals);
-                 Pool ->
-                     emysql:execute(Pool, Sql, CondVals)
-             end,
-    case Result of
-        #result_packet{rows = Rows} ->
-            case emysql_conv:as_record(Result, Rec, RecFields, Fun, AccIn) of
-                {[], NAccIn}  -> NAccIn;
-                {Rs, NAccIn}  ->
-                    LastRow = lists_utils:last(Rs),
-                    NextId = tuple_utils:value(OrderField, LastRow, RecFields),
-                    case Remain - BatchSize > 0 of
-                        true ->
-                            do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, AsRec,
-                                         Fun, NAccIn, (Remain - BatchSize), OrderField, NextId);
-                        false ->
-                            NAccIn
-                    end;
-                Rs when is_list(Rs)  ->
-                    LastRow = lists_utils:last(Rs),
-                    NextId = tuple_utils:value(OrderField, LastRow, RecFields),
-                    case Remain - BatchSize > 0 of
-                        true ->
-                            do_find_each(ConnOrPool, Table, Sql, CondVals, BatchSize, AsRec,
-                                         Fun, undefined, (Remain - BatchSize), OrderField, NextId);
-                        false ->
+            Result = case ConnOrPool of
+                         #emysql_connection{} = Conn ->
+                             emysql_conn:execute(Conn, Sql, CondVals);
+                         Pool ->
+                             emysql:execute(Pool, Sql, CondVals)
+                     end,
+            case Result of
+                #result_packet{rows = Rows} ->
+                    case emysql_conv:as_record(Result, Rec, RecFields, Fun, AccIn) of
+                        {[], NAccIn}  -> NAccIn;
+                        {Rs, NAccIn}  ->
+                            LastRow = lists_utils:last(Rs),
+                            NextId = tuple_utils:value(OrderField, LastRow, RecFields),
+                            case Remain - BatchSize > 0 of
+                                true ->
+                                    do_find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec,
+                                                 Fun, NAccIn, (Remain - BatchSize), NextId);
+                                false ->
+                                    NAccIn
+                            end;
+                        Rs when is_list(Rs)  ->
+                            LastRow = lists_utils:last(Rs),
+                            NextId = case erlang:is_record(LastRow, Rec) of
+                                         true ->
+                                             tuple_utils:value(OrderField, LastRow, RecFields);
+                                         _ ->
+                                             undefined
+                                     end,
+                            case Remain - BatchSize > 0 of
+                                true ->
+                                    do_find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec,
+                                                 Fun, undefined, (Remain - BatchSize), NextId);
+                                false ->
                             ok
-                    end
-            end;
-        _ ->
-            AccIn
+                            end
+                    end;
+                _ ->
+                    AccIn
+            end
+    
     end.
             
                     
