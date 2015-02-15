@@ -64,7 +64,7 @@ as_record(#result_packet{} = Result, RecordName, Fields, Fun, AccIn) when is_ato
                                 RecordData = [ Fx(Row) || Fx <- Fs ],
                                 Rec = list_to_tuple([RecordName|RecordData]),
                                 NFunAccIn = Fun(Rec, FunAccIn),
-                                {[lists:append(Rec, RsAccIn), NFunAccIn]}
+                                {[lists:append(RsAccIn, [Rec]), NFunAccIn]}
                         end, {[], AccIn}, Result#result_packet.rows)
     end.
 
