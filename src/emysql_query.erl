@@ -23,7 +23,7 @@
 %%--------------------------------------------------------------------
 %% @doc
 %% e.g: find(my_pool, ["SELECT name FROM users where age > ? and time > ?", 12, "2013-12-03" ])
-%% 
+%%
 %%
 %% @spec
 %% @end
@@ -73,12 +73,12 @@ find(ConnOrPool, Table, SqlOptions, ?AS_VAL) ->
         #result_packet{rows = [[R] ]} -> R;
         #result_packet{rows = Rs }    ->
             lists:foldl(fun([R], AccIn) ->
-                                lists:append(AccIn, [R]) 
+                                lists:append(AccIn, [R])
                         end, [], Rs);
         #error_packet{code = Code, msg = Msg} ->
             throw({Code, Msg})
     end;
-    
+
 find(ConnOrPool, Table, SqlOptions, [Rec, RecFields] = _AsRec)  ->
     Result = find(ConnOrPool, Table, SqlOptions),
     emysql_conv:as_record(Result, Rec, RecFields).
@@ -134,11 +134,11 @@ find_each(ConnOrPool, Table, SqlOptions, AsRec, Fun, AccIn) ->
 
 find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun, AccIn) ->
     BaseId = undefined,
-    
+
     {[FindSql, FindCondVals],
      [CountSql, CountCondVals],
      [OField, OSort]} = build_sql(Table, SqlOptions, BatchSize, BaseId),
-    
+
     Result = case ConnOrPool of
                  #emysql_connection{} = Conn ->
                      emysql_conn:execute(Conn, CountSql, CountCondVals);
@@ -165,8 +165,8 @@ find_each(ConnOrPool, Table, SqlOptions, BatchSize, AsRec, Fun, AccIn) ->
         _ ->
             ok
     end.
-    
-        
+
+
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
@@ -181,7 +181,7 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
             V when is_list(V) -> string:join(V, ",");
             _ -> throw(bad_sql_select)
         end,
-        
+
     {Where, CondVals} = case proplists:get_value(where, SqlOptions) of
                             undefined -> {"", [ ]};
                             [ ]       -> {"", [ ]};
@@ -194,9 +194,13 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
                                                       S = type_utils:any_to_list(K) ++ " BETWEEN ? AND ? ",
                                                       {[S | StmtAcc], [V1, V2 | ValAcc]};
                                                   {K, in, V3} when is_list(V3) ->
-                                                      S = type_utils:any_to_list(K) ++ " IN (?) ",
-                                                      NV3 = string:join(V3, ", "), 
-                                                      {[S | StmtAcc], [NV3 | ValAcc]};
+                                                      InStmt = string:join(lists:duplicate(length(V3), "?"), ","),
+                                                      S = type_utils:any_to_list(K) ++ " IN (" ++ InStmt ++ ") ",
+
+                                                      NV3 = lists:foldl(fun(V3Item, ValAcc2) ->
+                                                                                [V3Item | ValAcc2]
+                                                                        end, ValAcc, V3),
+                                                      {[S | StmtAcc], NV3 };
                                                   {K, OP, V4} ->
                                                       S = string:join([type_utils:any_to_list(K),
                                                                        type_utils:any_to_list(OP),
@@ -213,7 +217,7 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
                             [ Cond ]        -> {"WHERE " ++ Cond, [ ]};
                             [Cond | Values] -> {"WHERE " ++ Cond, Values}
                         end,
-    
+
     [Order, OField, OSort] =
         case proplists:get_value(order, SqlOptions) of
             undefined -> ["", id, "ASC"];
@@ -230,7 +234,7 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
                 OrderStr3 = "ORDER BY " ++ type_utils:any_to_list(OrderBy),
                 [OrderStr3, undefined, undefined]
         end,
-    
+
     {Where2, CondVals2} =
         case {BaseId, OSort, Where} of
             {infinate,  _,  _} -> {Where, CondVals};
@@ -244,10 +248,10 @@ build_sql(Table, SqlOptions, BatchSize, BaseId) ->
                 {Where ++ " AND " ++ type_utils:any_to_list(OField) ++ " < ?",
                  lists:append(CondVals, [BaseId])}
         end,
-         
-    Limit = 
+
+    Limit =
         case BatchSize of
-            undefined -> 
+            undefined ->
                 case proplists:get_value(limit, SqlOptions) of
                     undefined   -> "";
                     [LV1, LV2]  ->
@@ -312,7 +316,5 @@ do_find_each(ConnOrPool, Table, SqlOptions, BatchSize, [Rec, RecFields] = AsRec,
                 _ ->
                     AccIn
             end
-    
+
     end.
-            
-                    
