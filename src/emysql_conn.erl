@@ -111,12 +111,12 @@ execute(Connection, transaction, Fun) when is_function(Fun) ->
 execute(Connection, StmtName, []) when is_atom(StmtName) ->
     prepare_statement(Connection, StmtName),
     StmtNameBin = atom_to_binary(StmtName, utf8),
-    execute_trace:execute(StmtName),
+    %execute_trace:execute(StmtName),
     Packet = <<?COM_QUERY, "EXECUTE ", StmtNameBin/binary>>,
     send_recv(Connection, Packet);
 execute(Connection, Query, []) ->
     QB = canonicalize_query(Query),
-    execute_trace:execute(raw_query, QB),
+    %execute_trace:execute(raw_query, QB),
     Packet = <<?COM_QUERY, QB/binary>>,
     send_recv(Connection, Packet);
 execute(Connection, Query, Args) when (is_list(Query) orelse is_binary(Query)) andalso is_list(Args) ->
@@ -127,7 +127,7 @@ execute(Connection, Query, Args) when (is_list(Query) orelse is_binary(Query)) a
         OK when is_record(OK, ok_packet) ->
             ParamNamesBin = list_to_binary(string:join([[$@ | integer_to_list(I)] || I <- lists:seq(1, length(Args))], ", ")),  % todo: utf8?
             Packet = <<?COM_QUERY, "EXECUTE ", (list_to_binary(StmtName))/binary, " USING ", ParamNamesBin/binary>>,  % todo: utf8?
-            execute_trace:execute(StmtName, Args),
+            %execute_trace:execute(StmtName, Args),
             send_recv(Connection, Packet);
         Error ->
             Error
@@ -151,7 +151,7 @@ prepare(Connection, Name, Statement) when is_atom(Name) ->
     prepare(Connection, atom_to_list(Name), Statement);
 prepare(Connection, Name, Statement) ->
     StatementBin = encode(Statement, binary),
-    execute_trace:prepare(Name, Statement),
+    %execute_trace:prepare(Name, Statement),
     Packet = <<?COM_QUERY, "PREPARE ", (list_to_binary(Name))/binary, " FROM ", StatementBin/binary>>,  % todo: utf8?
     case send_recv(Connection, Packet) of
         OK when is_record(OK, ok_packet) ->
@@ -163,20 +163,20 @@ prepare(Connection, Name, Statement) ->
 unprepare(Connection, Name) when is_atom(Name)->
     unprepare(Connection, atom_to_list(Name));
 unprepare(Connection, Name) ->
-    execute_trace:unprepare(Name),
+   % execute_trace:unprepare(Name),
     Packet = <<?COM_QUERY, "DEALLOCATE PREPARE ", (list_to_binary(Name))/binary>>,  % todo: utf8?
     send_recv(Connection, Packet).
 
 begin_transaction(Connection) ->
-    execute_trace:begin_transaction(),
+    %execute_trace:begin_transaction(),
     emysql_conn:execute(Connection, <<"BEGIN">>, []).
 
 rollback_transaction(Connection) ->
-    execute_trace:rollback_transaction(),
+    %execute_trace:rollback_transaction(),
     emysql_conn:execute(Connection, <<"ROLLBACK">>, []).
 
 commit_transaction(Connection) ->
-    execute_trace:commit_transaction(),
+    %execute_trace:commit_transaction(),
     emysql_conn:execute(Connection, <<"COMMIT">>, []).
 
 open_n_connections(PoolId, N) ->
@@ -373,7 +373,7 @@ need_test_connection(Conn) ->
      (Conn#emysql_connection.last_test_time + Conn#emysql_connection.test_period < now_seconds()).
 
 now_seconds() ->
-   {M, S, _} = erlang:now(),
+   {M, S, _} = os:timestamp(),
    M * 1000000 + S.
 
 %%--------------------------------------------------------------------
