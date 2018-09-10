@@ -9,11 +9,32 @@
 -module(emysql_saver).
 
 %% API
--export([save/3, save/4]).
+-export([save/3, save/4, get_save_sql/2, get_save_sql/3]).
 -include("emysql.hrl").
 %%%===================================================================
 %%% API
 %%%===================================================================
+%%% ======  获取批量操作 sql和 value ========
+get_save_sql(_Table, undefined) ->
+    ok;
+get_save_sql(_Table, [[], _]) ->
+    ok;
+get_save_sql(Table, RecordInput) ->
+    DefOpt = [{auto_id,    true},
+        {batch_size, 1000}],
+    get_save_sql(Table, RecordInput, DefOpt).
+
+get_save_sql(Table, [Record0, Fields] = _RecordInput, Options) ->
+    Records = case Record0 of
+                  V1 when is_list(V1) -> V1;
+                  V2                  -> [V2]
+              end,
+    case build_sql(Table, Records, Fields, Options) of
+        {insert, Sqls} ->
+            Sqls;
+        {update, {Sql, Values} } ->
+            {Sql, Values}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc
